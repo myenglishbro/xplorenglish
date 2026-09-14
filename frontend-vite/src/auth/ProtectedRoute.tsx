@@ -20,7 +20,18 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
   const { status, role, profileMissing } = useAuth();
   const location = useLocation();
 
-  if (status === "loading") {
+  // HOTFIX (hard reload en rutas anidadas): `status` pasa a "authenticated" en cuanto
+  // onAuthStateChange confirma la sesión, pero `profile`/`role` se cargan un instante después
+  // (round-trip aparte, ver AuthProvider). En ese hueco, `role` todavía es null sin que eso
+  // signifique "sin rol" -- antes, ese hueco caía en la rama `!role` de más abajo y hacía
+  // <Navigate to="/login"> SIN state.from, perdiendo la ruta anidada original (ej.
+  // /teacher/clases): LoginPage recién sabía el rol un instante después y, sin `from`, caía al
+  // home del rol (/teacher) en vez de la ruta pedida. La corrección es tratar este hueco como
+  // "todavía cargando" (mismo spinner que `status === "loading"`), nunca como un redirect --
+  // sin esto no hay forma de distinguir "cargando" de "sin sesión" solo mirando `role`.
+  const stillResolvingProfile = status === "authenticated" && !profileMissing && !role;
+
+  if (status === "loading" || stillResolvingProfile) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         <Spinner size={28} label="Cargando sesión…" />
@@ -45,6 +56,8 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
     );
   }
 
+  // Acá `role` está garantizado no-null: unauthenticated y profileMissing ya se manejaron arriba,
+  // y stillResolvingProfile descarta el único hueco donde status="authenticated" con role=null.
   if (!role) {
     return <Navigate to="/login" replace />;
   }

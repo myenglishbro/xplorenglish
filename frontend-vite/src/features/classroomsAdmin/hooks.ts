@@ -4,7 +4,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { listClassrooms, getClassroomDetail, listAssignableTeachers, listAssignableStudents } from "@/server/admin/classrooms/queries";
 import { getClassroomTeacherCompatibility } from "@/server/scheduling/compatibility";
 import { classroomSchema, type ClassroomInput } from "@/server/admin/classrooms/validation";
-import type { ClassroomListFilters, ClassroomTeacherRole } from "@/server/admin/classrooms/types";
+import type { AssignableTeacher, ClassroomListFilters, ClassroomTeacherRole } from "@/server/admin/classrooms/types";
 
 export type ClassroomFieldErrors = Partial<Record<keyof ClassroomInput, string>>;
 
@@ -37,11 +37,18 @@ export function useAssignableStudents() {
   });
 }
 
-export function useClassroomCompatibility(classroomId: number) {
+/**
+ * `teachers` es la MISMA lista que ya carga useAssignableTeachers() en la página de detalle de
+ * salón -- se pasa como argumento en vez de que este hook (vía getClassroomTeacherCompatibility)
+ * vuelva a pedir teacher_profiles por su cuenta (performance slice 1: eliminaba un round-trip
+ * duplicado en /admin/salones/:id). Por eso queda deshabilitado hasta que `teachers` esté
+ * disponible -- nunca calcula compatibilidad con una lista vacía por carecer todavía del dato real.
+ */
+export function useClassroomCompatibility(classroomId: number, teachers: AssignableTeacher[] | undefined) {
   return useQuery({
     queryKey: queryKeys.adminClassroomCompatibility(classroomId),
-    queryFn: () => getClassroomTeacherCompatibility(supabase, classroomId),
-    enabled: Number.isFinite(classroomId),
+    queryFn: () => getClassroomTeacherCompatibility(supabase, classroomId, teachers!),
+    enabled: Number.isFinite(classroomId) && teachers !== undefined,
   });
 }
 
@@ -123,13 +130,19 @@ const ASSIGN_PRIMARY_ERROR_MESSAGES: Record<string, string> = {
  * assign_classroom_primary_teacher (0015) -- RPC directo, desactiva atómicamente cualquier
  * PRIMARY activo distinto y hace upsert del nuevo. La compatibilidad se recalcula aquí mismo
  * justo antes de llamar al RPC (nunca se confía en un estado ya calculado en el cliente, que
- * pudo quedar desactualizado): mismo criterio que assignPrimaryTeacherAction (Next).
+ * pudo quedar desactualizado): mismo criterio que assignPrimaryTeacherAction (Next). A propósito
+ * pide `listAssignableTeachers` FRESCO en vez de reutilizar la lista ya cargada por la página
+ * (useAssignableTeachers) -- esta es la revalidación de seguridad justo antes del RPC, no la carga
+ * inicial de UI que sí se deduplicó (performance slice 1); debe reflejar el estado más actual
+ * posible de qué docentes siguen activos. El RPC en Postgres sigue siendo la autoridad real
+ * (0019/0020): esto es defensa en profundidad en el cliente, nunca el único control.
  */
 export function useAssignPrimaryTeacher(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (teacherId: string) => {
-      const compatibility = await getClassroomTeacherCompatibility(supabase, classroomId);
+      const activeTeachers = await listAssignableTeachers(supabase);
+      const compatibility = await getClassroomTeacherCompatibility(supabase, classroomId, activeTeachers);
       if (!compatibility.hasActiveSchedules) {
         throw new Error("Define primero el horario del salón antes de asignar un docente titular.");
       }

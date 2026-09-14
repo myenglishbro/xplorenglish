@@ -1,15 +1,18 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useClassroomDetail, useAssignableTeachers, useAssignableStudents, useClassroomCompatibility } from "@/features/classroomsAdmin/hooks";
 import { usePrograms } from "@/features/users/hooks";
+import { useClassSchedules } from "@/features/schedulingAdmin/hooks";
 import { Card } from "@/components/ui/surfaces/Card";
 import { Tag } from "@/components/ui/core/Tag";
 import { Icon } from "@/components/ui/core/Icon";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
+import { Alert } from "@/components/ui/feedback/Alert";
 import { ClassroomEditForm } from "@/components/admin/classrooms/ClassroomEditForm";
 import { ClassroomStatusToggle } from "@/components/admin/classrooms/ClassroomStatusToggle";
 import { ClassroomTeachersPanel } from "@/components/admin/classrooms/ClassroomTeachersPanel";
 import { ClassroomStudentsPanel } from "@/components/admin/classrooms/ClassroomStudentsPanel";
+import { WeeklyScheduleList } from "@/components/admin/scheduling/WeeklyScheduleList";
 
 function cardTitle(text: string) {
   return (
@@ -24,12 +27,18 @@ function cardTitle(text: string) {
 export function SalonDetailAdminPage() {
   const { id } = useParams<{ id: string }>();
   const classroomId = Number(id);
+  const location = useLocation();
+  const justCreated = Boolean((location.state as { justCreated?: boolean } | null)?.justCreated);
 
   const classroomQuery = useClassroomDetail(classroomId);
   const programsQuery = usePrograms();
   const assignableTeachersQuery = useAssignableTeachers();
   const assignableStudentsQuery = useAssignableStudents();
-  const compatibilityQuery = useClassroomCompatibility(classroomId);
+  // Misma lista que ya trae assignableTeachersQuery -- se le pasa tal cual, así
+  // getClassroomTeacherCompatibility ya no vuelve a pedir teacher_profiles por su cuenta
+  // (performance slice 1). Queda deshabilitada hasta que esa lista llegue (ver hooks.ts).
+  const compatibilityQuery = useClassroomCompatibility(classroomId, assignableTeachersQuery.data);
+  const classSchedulesQuery = useClassSchedules(classroomId);
 
   if (!Number.isFinite(classroomId)) {
     return <EmptyState icon="warning" title="Este salón no existe">Vuelve al listado de Salones.</EmptyState>;
@@ -52,9 +61,14 @@ export function SalonDetailAdminPage() {
   const assignableTeachers = assignableTeachersQuery.data ?? [];
   const assignableStudents = assignableStudentsQuery.data ?? [];
   const compatibility = compatibilityQuery.data ?? { hasActiveSchedules: false, schedules: [], teachers: [] };
+  const schedules = classSchedulesQuery.data ?? [];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+      {justCreated && (
+        <Alert tone="info">Ahora configura el horario semanal y asigna el docente titular.</Alert>
+      )}
+
       <div>
         <Link
           to="/admin/salones"
@@ -89,6 +103,10 @@ export function SalonDetailAdminPage() {
             <p style={{ marginTop: "var(--space-3)", font: "var(--weight-regular) var(--text-caption-size)/1.4 var(--font-body)", color: "var(--text-muted)" }}>
               Archivar no borra ni desactiva a los docentes ni estudiantes asignados -- solo oculta el salón de sus listados. Al reactivarlo, sus miembros activos recuperan acceso automáticamente.
             </p>
+          </Card>
+
+          <Card header={cardTitle("Horario semanal")}>
+            <WeeklyScheduleList classroomId={classroom.id} schedules={schedules} />
           </Card>
 
           <Card header={cardTitle("Docentes")}>

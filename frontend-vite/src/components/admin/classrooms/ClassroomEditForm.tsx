@@ -67,7 +67,7 @@ export function ClassroomEditForm({ classroom, programs }: ClassroomEditFormProp
         <Input id="description" name="description" defaultValue={classroom.description ?? ""} disabled={mutation.isPending} />
       </Field>
 
-      <Field label="Horario" htmlFor="schedule_notes" hint="Texto libre, ej. Lun/Mié 6-8pm" error={fieldErrors.schedule_notes}>
+      <Field label="Notas del horario (opcional)" htmlFor="schedule_notes" hint="Texto libre, no reemplaza el horario semanal (ver sección Horario semanal más abajo)" error={fieldErrors.schedule_notes}>
         <Input id="schedule_notes" name="schedule_notes" defaultValue={classroom.scheduleNotes ?? ""} disabled={mutation.isPending} />
       </Field>
 

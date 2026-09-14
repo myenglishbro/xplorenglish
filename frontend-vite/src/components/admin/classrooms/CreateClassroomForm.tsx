@@ -32,7 +32,7 @@ export function CreateClassroomForm({ programs }: CreateClassroomFormProps) {
         description: String(formData.get("description") ?? ""),
         schedule_notes: String(formData.get("schedule_notes") ?? ""),
       });
-      navigate(`/admin/salones/${classroomId}`);
+      navigate(`/admin/salones/${classroomId}`, { state: { justCreated: true } });
     } catch (err) {
       if (err && typeof err === "object" && "fieldErrors" in err) {
         setFieldErrors((err as { fieldErrors: ClassroomFieldErrors }).fieldErrors);
@@ -70,7 +70,7 @@ export function CreateClassroomForm({ programs }: CreateClassroomFormProps) {
         <Input id="description" name="description" disabled={mutation.isPending} />
       </Field>
 
-      <Field label="Horario" htmlFor="schedule_notes" hint="Texto libre, ej. Lun/Mié 6-8pm" error={fieldErrors.schedule_notes}>
+      <Field label="Notas del horario (opcional)" htmlFor="schedule_notes" hint="Texto libre, no reemplaza el horario semanal (se define después de crear el salón)" error={fieldErrors.schedule_notes}>
         <Input id="schedule_notes" name="schedule_notes" disabled={mutation.isPending} />
       </Field>
 

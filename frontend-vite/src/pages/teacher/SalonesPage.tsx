@@ -49,7 +49,7 @@ export function TeacherSalonesPage() {
                   </div>
                   {c.description && <p style={{ margin: 0, color: "var(--text-body)" }}>{c.description}</p>}
                   {c.scheduleNotes && (
-                    <div style={{ color: "var(--text-muted)", fontSize: "var(--text-caption-size)" }}>Horario: {c.scheduleNotes}</div>
+                    <div style={{ color: "var(--text-muted)", fontSize: "var(--text-caption-size)" }}>Notas: {c.scheduleNotes}</div>
                   )}
                   <div style={{ color: "var(--text-muted)", fontSize: "var(--text-caption-size)" }}>{c.studentCount} estudiante{c.studentCount === 1 ? "" : "s"}</div>
                 </div>

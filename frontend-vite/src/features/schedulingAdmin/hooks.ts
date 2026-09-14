@@ -179,7 +179,28 @@ export function useAllClassSchedules() {
   });
 }
 
+/** Horarios de UN solo salón -- a diferencia de useAllClassSchedules (todos los salones, filtrado
+ * client-side), esta filtra server-side vía getClassSchedules(classroomId). Reemplaza el uso de
+ * useAllClassSchedules en /admin/salones/:id (performance slice 1): esa pantalla nunca necesitó el
+ * horario de los demás salones. /admin/calendario sigue usando useAllClassSchedules a propósito
+ * (ahí sí hace falta ver/elegir entre varios salones en el mismo modal). */
+export function useClassSchedules(classroomId: number) {
+  return useQuery({
+    queryKey: queryKeys.adminClassSchedules(classroomId),
+    queryFn: () => getClassSchedules(supabase, classroomId),
+    enabled: Number.isFinite(classroomId),
+  });
+}
+
 export type ClassScheduleFieldErrors = Partial<Record<keyof ClassScheduleInput, string>>;
+
+/** Invalida ambas fuentes de class_schedules -- la vista "todos los salones" (Calendario) y la
+ * vista "un salón" (Salones) no comparten queryKey, así que una mutación desde cualquiera de las
+ * dos pantallas debe refrescar las dos. */
+function invalidateClassScheduleQueries(queryClient: ReturnType<typeof useQueryClient>, classroomId: number) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.adminAllClassSchedules() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.adminClassSchedules(classroomId) });
+}
 
 export function useCreateClassSchedule(classroomId: number) {
   const queryClient = useQueryClient();
@@ -199,21 +220,59 @@ export function useCreateClassSchedule(classroomId: number) {
         .insert({ classroom_id: classroomId, day_of_week: parsed.data.dayOfWeek, start_time: parsed.data.startTime, end_time: parsed.data.endTime });
       if (error) throw new Error(parseRpcError(error));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.adminAllClassSchedules() }),
+    onSuccess: () => invalidateClassScheduleQueries(queryClient, classroomId),
   });
 }
 
 /** Activar/editar un horario cuando el salón ya tiene PRIMARY revalida su compatibilidad
  * server-side (trigger class_schedules_check_primary_compatibility, 0019) -- por eso este error
  * también se traduce con parseRpcError en vez del mensaje genérico anterior. */
-export function useSetClassScheduleActive() {
+export function useSetClassScheduleActive(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ scheduleId, isActive }: { scheduleId: number; isActive: boolean }) => {
       const { error } = await supabase.from("class_schedules").update({ is_active: isActive }).eq("id", scheduleId);
       if (error) throw new Error(parseRpcError(error));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.adminAllClassSchedules() }),
+    onSuccess: () => invalidateClassScheduleQueries(queryClient, classroomId),
+  });
+}
+
+/** Editar día/hora de un horario existente -- mismo trigger de revalidación de compatibilidad que
+ * useSetClassScheduleActive (0019) cuando el salón ya tiene PRIMARY. */
+export function useUpdateClassSchedule(scheduleId: number, classroomId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ClassScheduleInput) => {
+      const parsed = classScheduleSchema.safeParse(input);
+      if (!parsed.success) {
+        const fieldErrors: ClassScheduleFieldErrors = {};
+        for (const issue of parsed.error.issues) {
+          const key = issue.path[0];
+          if (typeof key === "string") fieldErrors[key as keyof ClassScheduleFieldErrors] = issue.message;
+        }
+        throw { fieldErrors } as { fieldErrors: ClassScheduleFieldErrors };
+      }
+      const { error } = await supabase
+        .from("class_schedules")
+        .update({ day_of_week: parsed.data.dayOfWeek, start_time: parsed.data.startTime, end_time: parsed.data.endTime })
+        .eq("id", scheduleId);
+      if (error) throw new Error(parseRpcError(error));
+    },
+    onSuccess: () => invalidateClassScheduleQueries(queryClient, classroomId),
+  });
+}
+
+/** class_schedules_admin_write (0006) es "for all", así que DELETE ya está permitido por RLS sin
+ * cambios de backend -- misma política que ya usan insert/update. */
+export function useDeleteClassSchedule(classroomId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (scheduleId: number) => {
+      const { error } = await supabase.from("class_schedules").delete().eq("id", scheduleId);
+      if (error) throw new Error(parseRpcError(error));
+    },
+    onSuccess: () => invalidateClassScheduleQueries(queryClient, classroomId),
   });
 }
 

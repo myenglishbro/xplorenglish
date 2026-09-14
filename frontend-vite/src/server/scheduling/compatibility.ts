@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { getLimaWeekday, toLimaDateTimeInputValues } from "@/lib/datetime/lima";
-import { listAssignableTeachers } from "@/server/admin/classrooms/queries";
+import type { AssignableTeacher } from "@/server/admin/classrooms/types";
 import { getClassSchedules } from "./queries";
 import type { ClassScheduleItem } from "./types";
 import type { TeacherCompatibilityItem, TeacherCompatibilityStatus } from "./types";
@@ -64,16 +64,27 @@ export interface ClassroomCompatibilityResult {
  * El salón que se está editando se excluye explícitamente de ambas fuentes (`neq classroom_id`)
  * para que un docente no entre en conflicto consigo mismo al reconfirmar su propio salón.
  *
- * Sin importar cuántos docentes existan: nunca 1 query por docente (batch fijo, ~5 round-trips
- * como máximo, 2 de ellos solo si el docente candidato ya es PRIMARY de algún otro salón).
+ * Sin importar cuántos docentes existan: nunca 1 query por docente (batch fijo, ~4 round-trips
+ * como máximo, 1 de ellos solo si el docente candidato ya es PRIMARY de algún otro salón).
  * Prioridad cuando concurren varias razones: sin disponibilidad > fuera de disponibilidad >
  * conflicto -- reflejada en el orden de los `if` de abajo. Reutilizada tal cual tanto para pintar
  * el selector de PRIMARY como, en useAssignPrimaryTeacher, para revalidar justo antes de llamar al
  * RPC (nunca se confía en el estado "compatible" que pudo haber calculado el cliente antes) --
  * ver el hallazgo de seguridad en el informe: esta revalidación sigue siendo client-side, el RPC
  * assign_classroom_primary_teacher en sí no valida disponibilidad/conflicto.
+ *
+ * `activeTeachers` SIEMPRE lo trae el caller (nunca se vuelve a pedir `teacher_profiles` aquí
+ * dentro, performance slice 1): la página de detalle de salón ya tiene ese listado cargado
+ * (useAssignableTeachers) y lo reutiliza tal cual; useAssignPrimaryTeacher, en cambio, pide un
+ * listado FRESCO justo antes de revalidar (ver hooks.ts) -- mismo criterio de "nunca confiar en
+ * estado potencialmente viejo" que ya aplicaba antes de este cambio, ahora explícito en la firma
+ * en vez de escondido dentro de esta función.
  */
-export async function getClassroomTeacherCompatibility(supabase: Client, classroomId: number): Promise<ClassroomCompatibilityResult> {
+export async function getClassroomTeacherCompatibility(
+  supabase: Client,
+  classroomId: number,
+  activeTeachers: AssignableTeacher[]
+): Promise<ClassroomCompatibilityResult> {
   const allSchedules = await getClassSchedules(supabase, classroomId);
   const schedules = allSchedules.filter((s) => s.isActive);
 
@@ -81,7 +92,6 @@ export async function getClassroomTeacherCompatibility(supabase: Client, classro
     return { hasActiveSchedules: false, schedules: [], teachers: [] };
   }
 
-  const activeTeachers = await listAssignableTeachers(supabase);
   if (activeTeachers.length === 0) {
     return { hasActiveSchedules: true, schedules, teachers: [] };
   }

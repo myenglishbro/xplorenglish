@@ -35,6 +35,7 @@ export const queryKeys = {
     ["admin-week-sessions", filters] as const,
   adminClassroomOptions: () => ["admin-classroom-options"] as const,
   adminAllClassSchedules: () => ["admin-all-class-schedules"] as const,
+  adminClassSchedules: (classroomId: number) => ["admin-class-schedules", classroomId] as const,
   adminPrimaryTeacherByClassroom: () => ["admin-primary-teacher-by-classroom"] as const,
   adminSessionDetail: (id: number) => ["admin-session", id] as const,
   adminSessionAttendanceRoster: (id: number) => ["admin-session-attendance", id] as const,

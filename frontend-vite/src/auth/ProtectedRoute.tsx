@@ -17,7 +17,7 @@ export interface ProtectedRouteProps {
  * verificado en la base. Este componente solo decide qué se PINTA en pantalla.
  */
 export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
-  const { status, role, profileMissing } = useAuth();
+  const { status, role, profile, profileMissing } = useAuth();
   const location = useLocation();
 
   // HOTFIX (hard reload en rutas anidadas): `status` pasa a "authenticated" en cuanto
@@ -60,6 +60,13 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
   // y stillResolvingProfile descarta el único hueco donde status="authenticated" con role=null.
   if (!role) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Cambio de contraseña obligatorio -- mismo criterio que requireProfile() en el Next legado
+  // (redirige ANTES de mirar el rol, para cualquier rol, no solo student -- ver ChangePasswordPage).
+  // /change-password nunca pasa por este componente, así que no hay riesgo de loop.
+  if (profile?.must_change_password) {
+    return <Navigate to="/change-password" replace />;
   }
 
   if (!allowedRoles.includes(role)) {

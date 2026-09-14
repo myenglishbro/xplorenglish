@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
-import { secureApiCall } from "@/lib/apiClient";
 import { listUsers, getUserDetail, getRoleChanges, listPrograms } from "@/server/admin/users/queries";
 import { updateUserProfileSchema, type UpdateUserProfileInput } from "@/server/admin/users/validation";
 import type { ProfileStatus, UserListFilters } from "@/server/admin/users/types";
@@ -128,14 +128,58 @@ export function usePromoteToTeacher(profileId: string) {
   });
 }
 
+export interface ResetTempPasswordResult {
+  tempPassword: string;
+  /** Presente solo en el caso parcial: la contraseña de Auth SÍ cambió, pero
+   * admin_reset_student_password_flag falló al marcar must_change_password=true. El admin debe
+   * seguir viendo la contraseña (nunca se pierde) junto con esta advertencia explícita -- nunca
+   * tratar este caso como un éxito silencioso. */
+  partialFailureWarning?: string;
+}
+
+async function parseFunctionsErrorMessage(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json();
+      if (body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string") {
+        return (body as { error: string }).error;
+      }
+    } catch {
+      // cuerpo no era JSON parseable -- se usa el mensaje genérico de abajo
+    }
+  }
+  return "No pudimos cambiar la contraseña. Inténtalo de nuevo en unos minutos.";
+}
+
 /**
- * Backend seguro -- requiere auth.admin.updateUserById() (service_role), nunca puede ir
- * browser-direct. Ver src/app/api/admin/users/[id]/reset-password/route.ts (Next).
+ * Edge Function (admin-reset-student-password) -- requiere auth.admin.updateUserById()
+ * (service_role), nunca puede ir browser-direct. Reemplaza el Route Handler de Next (eliminado)
+ * -- ya no depende de VITE_API_BASE_URL para esta operación. supabase.functions.invoke() adjunta
+ * el JWT de la sesión activa automáticamente; la función verifica ese JWT de verdad y comprueba
+ * profiles.role='admin' del lado del servidor, nunca confía en nada que mande este cliente aparte
+ * del id del estudiante objetivo.
+ *
+ * Mismo comportamiento parcial que el Route Handler que reemplaza: si auth.admin.updateUserById
+ * tiene éxito pero admin_reset_student_password_flag falla después, la función responde HTTP 207
+ * con { error, tempPassword } -- `supabase.functions.invoke` trata 207 como éxito (está en el
+ * rango 2xx), así que ese `error` llega en `data.error`, no como excepción. Nunca se descarta esa
+ * advertencia -- se expone como `partialFailureWarning` para que la UI la muestre explícitamente.
  */
 export function useResetTempPassword(profileId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => secureApiCall<{ tempPassword: string }>(`/api/admin/users/${profileId}/reset-password`, { method: "POST" }),
+    mutationFn: async (): Promise<ResetTempPasswordResult> => {
+      const { data, error } = await supabase.functions.invoke<{ tempPassword: string; error?: string }>("admin-reset-student-password", {
+        body: { targetId: profileId },
+      });
+      if (error) {
+        throw new Error(await parseFunctionsErrorMessage(error));
+      }
+      if (!data?.tempPassword) {
+        throw new Error("No pudimos cambiar la contraseña. Inténtalo de nuevo en unos minutos.");
+      }
+      return { tempPassword: data.tempPassword, partialFailureWarning: data.error };
+    },
     onSuccess: () => invalidateUserQueries(queryClient, profileId),
   });
 }

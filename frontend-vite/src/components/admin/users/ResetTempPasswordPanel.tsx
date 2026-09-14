@@ -13,15 +13,17 @@ export interface ResetTempPasswordPanelProps {
 /**
  * Regenera la contraseña temporal de un estudiante. Requiere confirmación explícita porque
  * invalida de inmediato la contraseña actual del estudiante (autenticada o no) -- backend seguro,
- * ver src/app/api/admin/users/[id]/reset-password/route.ts (Next).
+ * Edge Function admin-reset-student-password (Supabase).
  */
 export function ResetTempPasswordPanel({ userId, fullName }: ResetTempPasswordPanelProps) {
   const mutation = useResetTempPassword(userId);
   const [open, setOpen] = React.useState(false);
   const [tempPassword, setTempPassword] = React.useState<string | undefined>();
+  const [partialFailureWarning, setPartialFailureWarning] = React.useState<string | undefined>();
 
   function handleOpen() {
     setTempPassword(undefined);
+    setPartialFailureWarning(undefined);
     setOpen(true);
   }
 
@@ -35,6 +37,9 @@ export function ResetTempPasswordPanel({ userId, fullName }: ResetTempPasswordPa
     try {
       const result = await mutation.mutateAsync();
       setTempPassword(result.tempPassword);
+      // Éxito parcial: la contraseña SÍ cambió, pero no pudimos marcarla como temporal en el
+      // perfil -- nunca se oculta esto detrás de un éxito silencioso, el admin debe verlo.
+      setPartialFailureWarning(result.partialFailureWarning);
     } catch {
       // el error ya queda en mutation.error, se muestra en el modal
     }
@@ -72,6 +77,9 @@ export function ResetTempPasswordPanel({ userId, fullName }: ResetTempPasswordPa
         }
       >
         {mutation.isError && <Alert tone="danger" style={{ marginBottom: "var(--space-3)" }}>{(mutation.error as Error).message}</Alert>}
+        {partialFailureWarning && (
+          <Alert tone="warning" style={{ marginBottom: "var(--space-3)" }}>{partialFailureWarning}</Alert>
+        )}
         {tempPassword && <TempPasswordReveal password={tempPassword} label={`Nueva contraseña temporal de ${fullName}`} />}
       </Modal>
     </>

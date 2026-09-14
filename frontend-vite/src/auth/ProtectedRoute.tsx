@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./useAuth";
-import { ROLE_HOME_PATH, MIGRATED_ROLES, type UserRole } from "./roles";
+import { ROLE_HOME_PATH, type UserRole } from "./roles";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { Alert } from "@/components/ui/feedback/Alert";
 
@@ -71,22 +71,9 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
 
   if (!allowedRoles.includes(role)) {
     // Nunca a una página "prohibido": cada usuario termina en su propio home, mismo criterio que
-    // requireRole() en el proyecto Next. Si ese home es un rol todavía no migrado a este SPA
-    // (admin), <Navigate> a esa ruta no serviría de nada -- este router no la tiene -- así que
-    // hace falta un salto duro al Next viejo en vez de routing interno.
-    return MIGRATED_ROLES.includes(role) ? <Navigate to={ROLE_HOME_PATH[role]} replace /> : <HardRedirectToLegacy role={role} />;
+    // requireRole() en el proyecto Next.
+    return <Navigate to={ROLE_HOME_PATH[role]} replace />;
   }
 
   return <>{children}</>;
-}
-
-function HardRedirectToLegacy({ role }: { role: UserRole }) {
-  React.useEffect(() => {
-    window.location.replace(`${import.meta.env.VITE_API_BASE_URL}${ROLE_HOME_PATH[role]}`);
-  }, [role]);
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-      <Spinner size={28} label="Redirigiendo…" />
-    </div>
-  );
 }

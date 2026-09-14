@@ -153,11 +153,10 @@ async function parseFunctionsErrorMessage(error: unknown): Promise<string> {
 
 /**
  * Edge Function (admin-reset-student-password) -- requiere auth.admin.updateUserById()
- * (service_role), nunca puede ir browser-direct. Reemplaza el Route Handler de Next (eliminado)
- * -- ya no depende de VITE_API_BASE_URL para esta operación. supabase.functions.invoke() adjunta
- * el JWT de la sesión activa automáticamente; la función verifica ese JWT de verdad y comprueba
- * profiles.role='admin' del lado del servidor, nunca confía en nada que mande este cliente aparte
- * del id del estudiante objetivo.
+ * (service_role), nunca puede ir browser-direct. Reemplaza el Route Handler de Next (eliminado).
+ * supabase.functions.invoke() adjunta el JWT de la sesión activa automáticamente; la función
+ * verifica ese JWT de verdad y comprueba profiles.role='admin' del lado del servidor, nunca confía
+ * en nada que mande este cliente aparte del id del estudiante objetivo.
  *
  * Mismo comportamiento parcial que el Route Handler que reemplaza: si auth.admin.updateUserById
  * tiene éxito pero admin_reset_student_password_flag falla después, la función responde HTTP 207

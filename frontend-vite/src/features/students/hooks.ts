@@ -33,10 +33,10 @@ async function parseCreateStudentError(error: unknown): Promise<{ message: strin
 
 /**
  * Edge Function (admin-create-student) -- requiere auth.admin.createUser() (service_role), nunca
- * puede ir browser-direct. Reemplaza el Route Handler de Next (eliminado) -- ya no depende de
- * VITE_API_BASE_URL para esta operación. Mismo flujo exacto del lado del servidor: DNI pre-check +
- * auth.admin.createUser() + RPC admin_provision_student_profile() + compensación (deleteUser) si
- * el RPC falla -- todo eso vive en la Edge Function, este hook solo la invoca.
+ * puede ir browser-direct. Reemplaza el Route Handler de Next (eliminado). Mismo flujo exacto del
+ * lado del servidor: DNI pre-check + auth.admin.createUser() + RPC admin_provision_student_profile()
+ * + compensación (deleteUser) si el RPC falla -- todo eso vive en la Edge Function, este hook solo
+ * la invoca.
  */
 export function useCreateStudent() {
   const queryClient = useQueryClient();

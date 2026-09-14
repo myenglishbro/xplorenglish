@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/core/Button";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/auth/useAuth";
-import { ROLE_HOME_PATH, MIGRATED_ROLES } from "@/auth/roles";
+import { ROLE_HOME_PATH } from "@/auth/roles";
 
 /**
  * Portado conceptual de src/app/login/{page.tsx,LoginForm.tsx} (Next) -- mismo layout/Card, pero
@@ -31,16 +31,7 @@ export function LoginPage() {
 
   React.useEffect(() => {
     if (status !== "authenticated" || !role) return;
-
-    if (MIGRATED_ROLES.includes(role)) {
-      navigate(from ?? ROLE_HOME_PATH[role], { replace: true });
-      return;
-    }
-
-    // admin todavía no migrado a este frontend -- salto duro al Next viejo. Usar navigate() acá
-    // causaría un loop: este router no tiene ruta para /admin, así que el comodín "*" rebotaría
-    // de vuelta a /login indefinidamente.
-    window.location.replace(`${import.meta.env.VITE_API_BASE_URL}${ROLE_HOME_PATH[role]}`);
+    navigate(from ?? ROLE_HOME_PATH[role], { replace: true });
   }, [status, role, from, navigate]);
 
   // Evita el flash del formulario mientras AuthProvider todavía resuelve una sesión persistida

@@ -20,6 +20,8 @@ interface SessionBlock {
   endTime: string;
 }
 
+/** Regla de overlap pedida explícitamente: newStart < existingEnd && newEnd > existingStart,
+ * mismo día de semana. Adyacente (fin de uno = inicio del otro) NO es conflicto. */
 function overlaps(a: SessionBlock, b: { dayOfWeek: number; startTime: string; endTime: string }): boolean {
   return a.dayOfWeek === b.dayOfWeek && a.startTime < b.endTime && a.endTime > b.startTime;
 }
@@ -50,14 +52,26 @@ export interface ClassroomCompatibilityResult {
 }
 
 /**
- * Compatibilidad de CADA docente activo contra TODOS los class_schedules activos del salón --
- * batch de 4 queries fijas (schedules, docentes activos, disponibilidad de esos docentes,
- * sesiones 'scheduled' de esos docentes), sin importar cuántos docentes existan: nunca 1 query
- * por docente. Prioridad cuando concurren varias razones (pedida explícitamente): sin
- * disponibilidad > fuera de disponibilidad > conflicto -- reflejada en el orden de los `if` de
- * abajo. Reutilizada tal cual tanto para pintar el selector de PRIMARY como, en
- * assignPrimaryTeacherAction, para revalidar en servidor antes de escribir (nunca se confía en el
- * estado "compatible" que pudo haber calculado el cliente).
+ * Compatibilidad de CADA docente activo contra TODOS los class_schedules activos del salón.
+ * "Ocupado" tiene DOS fuentes, ambas revisadas (MVP final: asignación de docentes según
+ * disponibilidad y conflictos) -- nunca una segunda fuente de verdad inventada, ambas ya
+ * existían por separado en el modelo:
+ *  1) class_schedules activos de OTROS salones donde este docente es PRIMARY activo -- el
+ *     compromiso semanal recurrente, exista o no todavía una sesión concreta generada a partir
+ *     de él (GenerateSessionsButton es un paso aparte, manual).
+ *  2) sessions 'scheduled' futuras de este docente en otro salón -- ya existía antes de este
+ *     bloque (revalidación server-side de assignPrimaryTeacherAction en el Next original).
+ * El salón que se está editando se excluye explícitamente de ambas fuentes (`neq classroom_id`)
+ * para que un docente no entre en conflicto consigo mismo al reconfirmar su propio salón.
+ *
+ * Sin importar cuántos docentes existan: nunca 1 query por docente (batch fijo, ~5 round-trips
+ * como máximo, 2 de ellos solo si el docente candidato ya es PRIMARY de algún otro salón).
+ * Prioridad cuando concurren varias razones: sin disponibilidad > fuera de disponibilidad >
+ * conflicto -- reflejada en el orden de los `if` de abajo. Reutilizada tal cual tanto para pintar
+ * el selector de PRIMARY como, en useAssignPrimaryTeacher, para revalidar justo antes de llamar al
+ * RPC (nunca se confía en el estado "compatible" que pudo haber calculado el cliente antes) --
+ * ver el hallazgo de seguridad en el informe: esta revalidación sigue siendo client-side, el RPC
+ * assign_classroom_primary_teacher en sí no valida disponibilidad/conflicto.
  */
 export async function getClassroomTeacherCompatibility(supabase: Client, classroomId: number): Promise<ClassroomCompatibilityResult> {
   const allSchedules = await getClassSchedules(supabase, classroomId);
@@ -74,7 +88,11 @@ export async function getClassroomTeacherCompatibility(supabase: Client, classro
 
   const teacherIds = activeTeachers.map((t) => t.id);
 
-  const [{ data: availabilityRows, error: availabilityError }, { data: sessionRows, error: sessionsError }] = await Promise.all([
+  const [
+    { data: availabilityRows, error: availabilityError },
+    { data: sessionRows, error: sessionsError },
+    { data: otherPrimaryRows, error: otherPrimaryError },
+  ] = await Promise.all([
     supabase.from("teacher_availability").select("teacher_id, day_of_week, start_time, end_time").in("teacher_id", teacherIds),
     supabase
       .from("sessions")
@@ -83,10 +101,18 @@ export async function getClassroomTeacherCompatibility(supabase: Client, classro
       .neq("classroom_id", classroomId)
       .gte("scheduled_start", new Date().toISOString())
       .in("scheduled_teacher_id", teacherIds),
+    supabase
+      .from("classroom_teachers")
+      .select("teacher_id, classroom_id")
+      .eq("teacher_role", "PRIMARY")
+      .eq("status", "active")
+      .neq("classroom_id", classroomId)
+      .in("teacher_id", teacherIds),
   ]);
 
   if (availabilityError) throw availabilityError;
   if (sessionsError) throw sessionsError;
+  if (otherPrimaryError) throw otherPrimaryError;
 
   const availabilityByTeacher = new Map<string, AvailabilityBlock[]>();
   for (const row of availabilityRows) {
@@ -106,16 +132,53 @@ export async function getClassroomTeacherCompatibility(supabase: Client, classro
     sessionsByTeacher.set(row.scheduled_teacher_id, list);
   }
 
+  // Horarios semanales de OTROS salones donde cada docente candidato ya es PRIMARY activo --
+  // batch de 1 query adicional (solo si hay al menos una fila), nunca una por salón/docente.
+  const otherClassroomIds = [...new Set(otherPrimaryRows.map((r) => r.classroom_id))];
+  const schedulesByClassroom = new Map<number, AvailabilityBlock[]>();
+  if (otherClassroomIds.length > 0) {
+    const { data: otherScheduleRows, error: otherSchedulesError } = await supabase
+      .from("class_schedules")
+      .select("classroom_id, day_of_week, start_time, end_time")
+      .eq("is_active", true)
+      .in("classroom_id", otherClassroomIds);
+    if (otherSchedulesError) throw otherSchedulesError;
+
+    for (const row of otherScheduleRows) {
+      const list = schedulesByClassroom.get(row.classroom_id) ?? [];
+      list.push({ dayOfWeek: row.day_of_week, startTime: row.start_time.slice(0, 5), endTime: row.end_time.slice(0, 5) });
+      schedulesByClassroom.set(row.classroom_id, list);
+    }
+  }
+
+  const occupiedByTeacher = new Map<string, AvailabilityBlock[]>();
+  for (const row of otherPrimaryRows) {
+    const blocks = schedulesByClassroom.get(row.classroom_id) ?? [];
+    if (blocks.length === 0) continue;
+    const list = occupiedByTeacher.get(row.teacher_id) ?? [];
+    list.push(...blocks);
+    occupiedByTeacher.set(row.teacher_id, list);
+  }
+
   const teachers: TeacherCompatibilityItem[] = activeTeachers.map((teacher) => {
     const availability = availabilityByTeacher.get(teacher.id) ?? [];
     const sessions = sessionsByTeacher.get(teacher.id) ?? [];
+    const occupiedSchedules = occupiedByTeacher.get(teacher.id) ?? [];
+
+    // Normaliza cada schedule a HH:MM (sin segundos) UNA vez -- mismo formato exacto que
+    // occupiedSchedules/sessions, ambos ya vienen sliced desde su construcción arriba. Comparar
+    // strings de distinto ancho ("17:00" vs "17:00:00") rompería la regla de overlap en los
+    // bordes exactos (Caso D, adyacente).
+    const normalizedSchedules = schedules.map((s) => ({ dayOfWeek: s.dayOfWeek, startTime: s.startTime.slice(0, 5), endTime: s.endTime.slice(0, 5) }));
+    const hasScheduleConflict = normalizedSchedules.some((schedule) => occupiedSchedules.some((block) => overlaps(block, schedule)));
+    const hasSessionConflict = normalizedSchedules.some((schedule) => sessions.some((session) => overlaps(session, schedule)));
 
     let status: TeacherCompatibilityStatus;
     if (availability.length === 0) {
       status = "no_availability";
     } else if (!schedules.every((schedule) => coversSchedule(schedule, availability))) {
       status = "out_of_availability";
-    } else if (schedules.some((schedule) => sessions.some((session) => overlaps(session, { dayOfWeek: schedule.dayOfWeek, startTime: schedule.startTime.slice(0, 5), endTime: schedule.endTime.slice(0, 5) })))) {
+    } else if (hasScheduleConflict || hasSessionConflict) {
       status = "conflict";
     } else {
       status = "compatible";

@@ -72,10 +72,10 @@ export interface SessionDetail extends SessionListItem {
 export type TeacherCompatibilityStatus = "compatible" | "out_of_availability" | "conflict" | "no_availability";
 
 export const TEACHER_COMPATIBILITY_LABEL: Record<TeacherCompatibilityStatus, string> = {
-  compatible: "Compatible",
-  out_of_availability: "Fuera de disponibilidad",
-  conflict: "Conflicto con otra clase",
-  no_availability: "Sin disponibilidad registrada",
+  compatible: "Disponible",
+  out_of_availability: "No disponible (horario insuficiente)",
+  conflict: "Conflicto de horario",
+  no_availability: "No disponible (sin disponibilidad registrada)",
 };
 
 export const TEACHER_COMPATIBILITY_TONE: Record<TeacherCompatibilityStatus, "success" | "warning" | "danger" | "neutral"> = {

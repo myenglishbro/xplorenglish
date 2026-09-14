@@ -1403,6 +1403,13 @@ export type Database = {
         Args: { p_id: number }
         Returns: undefined
       }
+      get_user_emails: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          email: string | null
+          user_id: string
+        }[]
+      }
       initialize_session_attendance: {
         Args: { p_session_id: number }
         Returns: number

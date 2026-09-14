@@ -14,8 +14,8 @@ import { HourPackagesTable } from "@/components/admin/hours/HourPackagesTable";
  * (hours_packages), no de pagos (student_payments) -- ver /admin/pagos-estudiantes para eso.
  * Búsqueda 100% en el cliente sobre lo ya cargado (mismo criterio que ClassroomStudentsPanel):
  * nombre/apellido/DNI vienen embebidos en listHourPackagesForAdmin; el email se resuelve aparte
- * vía el endpoint seguro ya existente (/api/admin/users/emails) y se suma al mismo filtro, sin
- * crear ningún endpoint nuevo.
+ * vía useUserEmails (RPC get_user_emails, 0022) y se suma al mismo filtro, sin crear ningún
+ * endpoint ni RPC nuevo.
  */
 export function PaquetesPage() {
   const [search, setSearch] = React.useState("");

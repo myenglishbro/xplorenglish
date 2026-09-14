@@ -67,7 +67,7 @@ export async function getActiveClassroomCounts(supabase: Client, teacherIds: str
 }
 
 /** Combina lo ya resuelto por listTeacherProfiles + getActiveClassroomCounts + el Map de emails
- * (resuelto aparte, vía /api/admin/users/emails -- ver useTeachers) en el shape final de fila.
+ * (resuelto aparte, vía RPC get_user_emails -- ver useTeachers) en el shape final de fila.
  * Pura, sin red: separada así para que el orden real de fetch (profiles -> Promise.all(counts,
  * emails) -> merge) quede explícito en el hook, no escondido dentro de una sola función. */
 export function toTeacherListItem(

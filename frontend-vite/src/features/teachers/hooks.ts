@@ -1,19 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
-import { secureApiCall } from "@/lib/apiClient";
 import { listTeacherProfiles, getActiveClassroomCounts, toTeacherListItem } from "@/server/admin/teachers/queries";
 import { updateTeacherProfileSchema, type UpdateTeacherProfileInput } from "@/server/admin/teachers/validation";
 import { listMyClassroomsAsTeacher } from "@/server/teacher/classrooms/queries";
 import type { TeacherListItem } from "@/server/admin/teachers/types";
 
+const TEACHER_EMAILS_RPC_ERROR_MESSAGES: Record<string, string> = {
+  UNAUTHENTICATED: "Tu sesión expiró. Vuelve a iniciar sesión.",
+  NOT_AUTHORIZED: "Esta operación es exclusiva para administradores.",
+};
+
+function parseTeacherEmailsRpcError(error: { message: string }): Error {
+  const code = error.message.split(":")[0]?.trim() ?? "";
+  return new Error(TEACHER_EMAILS_RPC_ERROR_MESSAGES[code] ?? "No pudimos resolver los correos. Inténtalo de nuevo en unos minutos.");
+}
+
 /**
- * El email (auth.users, requiere service_role) sigue viniendo del backend seguro
- * (GET /api/admin/users/emails, sin cambios, performance slice 2 no lo toca) -- pero ya no espera
- * a que termine el conteo de salones de classroom_teachers para empezar: ambos solo necesitan los
- * ids de profiles, así que corren en Promise.all en cuanto listTeacherProfiles resuelve. Antes:
- * profiles -> classroom_teachers -> emails (3 olas). Ahora: profiles -> Promise.all(conteo, emails)
- * (2 olas) -- mismas 3 requests, ninguna duplicada, mismo shape final (TeacherListItem).
+ * El email (auth.users) ya no viene de Next -- Supabase RPC directo (0022: get_user_emails,
+ * SECURITY DEFINER, valida admin server-side). Sigue sin esperar a que termine el conteo de
+ * salones de classroom_teachers para empezar: ambos solo necesitan los ids de profiles, así que
+ * corren en Promise.all en cuanto listTeacherProfiles resuelve (performance slice 2, sin cambios
+ * acá). Antes: profiles -> classroom_teachers -> emails (3 olas, la última cruzando a Next). Ahora:
+ * profiles -> Promise.all(conteo, emails RPC) (2 olas, ambas contra Supabase) -- mismas 3
+ * requests, ninguna duplicada, mismo shape final (TeacherListItem).
  */
 export function useTeachers() {
   return useQuery({
@@ -25,9 +35,12 @@ export function useTeachers() {
       const ids = profiles.map((p) => p.id);
       const [countByTeacher, emailById] = await Promise.all([
         getActiveClassroomCounts(supabase, ids),
-        secureApiCall<{ emails: Record<string, string | null> }>(`/api/admin/users/emails?ids=${ids.join(",")}`, { method: "GET" }).then(
-          (res) => new Map(Object.entries(res.emails))
-        ),
+        supabase
+          .rpc("get_user_emails", { p_user_ids: ids })
+          .then(({ data, error }) => {
+            if (error) throw parseTeacherEmailsRpcError(error);
+            return new Map((data ?? []).map((row) => [row.user_id, row.email] as const));
+          }),
       ]);
 
       return profiles.map((p) => toTeacherListItem(p, countByTeacher, emailById));

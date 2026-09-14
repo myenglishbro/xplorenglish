@@ -140,15 +140,37 @@ export function useResetTempPassword(profileId: string) {
   });
 }
 
+const USER_EMAILS_RPC_ERROR_MESSAGES: Record<string, string> = {
+  UNAUTHENTICATED: "Tu sesión expiró. Vuelve a iniciar sesión.",
+  NOT_AUTHORIZED: "Esta operación es exclusiva para administradores.",
+};
+
+function parseUserEmailsRpcError(error: { message: string }): Error {
+  const code = error.message.split(":")[0]?.trim() ?? "";
+  return new Error(USER_EMAILS_RPC_ERROR_MESSAGES[code] ?? "No pudimos resolver los correos. Inténtalo de nuevo en unos minutos.");
+}
+
 /**
- * Resolución de emails (profiles no tiene columna email) -- backend seguro, requiere
- * auth.admin.listUsers(). Ver src/app/api/admin/users/emails/route.ts (Next). Reutilizado tanto
- * por Docentes (listado + detalle) como por el detalle individual de Usuarios si hiciera falta.
+ * Resolución de emails (profiles no tiene columna email, solo vive en auth.users) -- Supabase RPC
+ * directo (0022: get_user_emails), ya no pasa por Next. SECURITY DEFINER + chequeo de
+ * auth.uid()/profiles.role='admin' dentro de la función (nunca en el cliente); ids que no
+ * corresponden a ninguna fila simplemente no aparecen en `emails` -- mismo comportamiento que el
+ * Route Handler que reemplaza, los consumidores ya normalizan con `emails[id] ?? null`.
+ * Reutilizado tanto por Docentes (listado + detalle) como por Paquetes.
  */
 export function useUserEmails(ids: string[]) {
   return useQuery({
     queryKey: queryKeys.adminUserEmails(ids),
-    queryFn: () => secureApiCall<{ emails: Record<string, string | null> }>(`/api/admin/users/emails?ids=${ids.join(",")}`, { method: "GET" }),
+    queryFn: async (): Promise<{ emails: Record<string, string | null> }> => {
+      const { data, error } = await supabase.rpc("get_user_emails", { p_user_ids: ids });
+      if (error) throw parseUserEmailsRpcError(error);
+
+      const emails: Record<string, string | null> = {};
+      for (const row of data ?? []) {
+        emails[row.user_id] = row.email;
+      }
+      return { emails };
+    },
     enabled: ids.length > 0,
   });
 }

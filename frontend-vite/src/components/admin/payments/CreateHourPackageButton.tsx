@@ -9,6 +9,9 @@ import { useCreateHourPackage, type CreateHourPackageFieldErrors } from "@/featu
 
 export interface CreateHourPackageButtonProps {
   students: { id: string; firstName: string; lastName: string; dni: string }[];
+  /** Mismo flujo exacto (create_hour_package registra el pago Y el paquete juntos) -- solo cambia
+   * la etiqueta del botón según desde dónde se abre (/admin/pagos-estudiantes vs /admin/paquetes). */
+  triggerLabel?: string;
 }
 
 /**
@@ -18,7 +21,7 @@ export interface CreateHourPackageButtonProps {
  * reenvía exactamente la misma key -- create_hour_package (0009) la usa para detectar un retry de
  * la MISMA operación y devolver lo ya creado sin duplicar.
  */
-export function CreateHourPackageButton({ students }: CreateHourPackageButtonProps) {
+export function CreateHourPackageButton({ students, triggerLabel = "Registrar pago" }: CreateHourPackageButtonProps) {
   const formId = React.useId();
   const mutation = useCreateHourPackage();
   const [open, setOpen] = React.useState(false);
@@ -80,7 +83,7 @@ export function CreateHourPackageButton({ students }: CreateHourPackageButtonPro
   return (
     <>
       <Button variant="primary" size="sm" icon="plus" onClick={handleOpen}>
-        Registrar pago
+        {triggerLabel}
       </Button>
       <Modal
         open={open}

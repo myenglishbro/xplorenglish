@@ -17,6 +17,7 @@ import { SalonesPage } from "@/pages/admin/SalonesPage";
 import { NuevoSalonPage } from "@/pages/admin/NuevoSalonPage";
 import { SalonDetailAdminPage } from "@/pages/admin/SalonDetailAdminPage";
 import { PaquetesPage } from "@/pages/admin/PaquetesPage";
+import { EstudianteHorasDetailPage } from "@/pages/admin/EstudianteHorasDetailPage";
 import { ReportesPage } from "@/pages/admin/ReportesPage";
 import { ConfiguracionPage } from "@/pages/admin/ConfiguracionPage";
 import { PagosEstudiantesListPage } from "@/pages/admin/PagosEstudiantesListPage";
@@ -99,6 +100,7 @@ export const router = createBrowserRouter([
       { path: "calendario", element: <CalendarioPage /> },
       { path: "calendario/:id", element: <SessionDetailAdminPage /> },
       { path: "paquetes", element: <PaquetesPage /> },
+      { path: "paquetes/:studentId", element: <EstudianteHorasDetailPage /> },
       { path: "pagos-estudiantes", element: <PagosEstudiantesListPage /> },
       { path: "pagos-estudiantes/:id", element: <PagoEstudianteDetailPage /> },
       { path: "pagos-docentes", element: <PagosDocentesListPage /> },

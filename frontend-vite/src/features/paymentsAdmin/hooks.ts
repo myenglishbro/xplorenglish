@@ -70,8 +70,10 @@ export function useCreateHourPackage() {
 
       return { paymentId: row.payment_id, packageId: row.package_id, movementId: row.movement_id };
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-student-payments"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminHourPackages() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminStudentHoursMovements(variables.studentId) });
     },
   });
 }

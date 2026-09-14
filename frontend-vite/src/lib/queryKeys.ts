@@ -38,4 +38,6 @@ export const queryKeys = {
   adminPrimaryTeacherByClassroom: () => ["admin-primary-teacher-by-classroom"] as const,
   adminSessionDetail: (id: number) => ["admin-session", id] as const,
   adminSessionAttendanceRoster: (id: number) => ["admin-session-attendance", id] as const,
+  adminHourPackages: () => ["admin-hour-packages"] as const,
+  adminStudentHoursMovements: (studentId: string) => ["admin-student-hours-movements", studentId] as const,
 };

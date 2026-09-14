@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { LandingPage } from "@/pages/public/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { RegisterPage } from "@/pages/RegisterPage";
 import { ChangePasswordPage } from "@/pages/ChangePasswordPage";
 import { TeacherLayout } from "@/layouts/TeacherLayout";
 import { StudentLayout } from "@/layouts/StudentLayout";
@@ -46,6 +47,7 @@ import { StudentTestDeNivelPage } from "@/pages/student/TestDeNivelPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/register", element: <RegisterPage /> },
   { path: "/change-password", element: <ChangePasswordPage /> },
   {
     path: "/teacher",

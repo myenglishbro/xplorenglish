@@ -1,6 +1,6 @@
 import React from "react";
 
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 
 import { Card } from "@/components/ui/surfaces/Card";
 import { Logo } from "@/components/ui/core/Logo";
@@ -27,7 +27,7 @@ export function LoginPage() {
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const { status, role, profileMissing } = useAuth();
+  const { status, role, profileMissing, profileProvisionError } = useAuth();
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -432,8 +432,10 @@ export function LoginPage() {
 
                   {profileMissing && (
                     <Alert tone="danger">
-                      Tu cuenta no tiene un perfil asociado. Contacta a un
-                      administrador.
+                      {/* profileProvisionError es más específico (p. ej. DNI duplicado tras
+                      confirmar el correo de un autorregistro) que el mensaje genérico de
+                      "sin perfil" -- ver AuthProvider.completeSelfRegistrationIfPending. */}
+                      {profileProvisionError ?? "Tu cuenta no tiene un perfil asociado. Contacta a un administrador."}
                     </Alert>
                   )}
                 </div>
@@ -500,6 +502,19 @@ export function LoginPage() {
                   >
                     Iniciar sesión
                   </Button>
+
+                  <Link
+                    to="/register"
+                    style={{
+                      display: "block",
+                      textAlign: "center",
+                      font: "var(--weight-semibold) var(--text-body-sm-size)/1.4 var(--font-body)",
+                      color: "var(--cyan-700)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    ¿Eres estudiante nuevo? Crear cuenta
+                  </Link>
                 </form>
 
                 {/* Support copy */}

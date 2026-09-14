@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
+import { LandingPage } from "@/pages/public/LandingPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { TeacherLayout } from "@/layouts/TeacherLayout";
 import { StudentLayout } from "@/layouts/StudentLayout";
@@ -109,6 +110,6 @@ export const router = createBrowserRouter([
       { path: "configuracion", element: <ConfiguracionPage /> },
     ],
   },
-  { path: "/", element: <Navigate to="/login" replace /> },
+  { path: "/", element: <LandingPage /> },
   { path: "*", element: <Navigate to="/login" replace /> },
 ]);

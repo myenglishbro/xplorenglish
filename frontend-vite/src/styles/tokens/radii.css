@@ -1,0 +1,9 @@
+:root{
+  --radius-xs:4px;
+  --radius-sm:6px;
+  --radius-md:10px;   /* buttons, inputs, tabs — matches Style Guide v1.0 */
+  --radius-lg:14px;   /* cards, panels */
+  --radius-xl:20px;   /* hero panels, modals */
+  --radius-pill:999px;/* search field, chips, avatars */
+  --border-width:1px;--border-width-strong:2px;
+}

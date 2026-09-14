@@ -6,7 +6,7 @@ import { TeachersTable } from "@/components/admin/teachers/TeachersTable";
 
 /**
  * Portado de src/app/admin/docentes/page.tsx. El listado muestra teacher_profiles.status
- * (¿está operativo?), no profiles.status -- ver TeacherListItem/listTeachers para el criterio
+ * (¿está operativo?), no profiles.status -- ver TeacherListItem/useTeachers para el criterio
  * completo. profiles.status ("Estado de cuenta") queda solo en el detalle.
  */
 export function DocentesListPage() {

@@ -2,27 +2,35 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
 import { secureApiCall } from "@/lib/apiClient";
-import { listTeachers } from "@/server/admin/teachers/queries";
+import { listTeacherProfiles, getActiveClassroomCounts, toTeacherListItem } from "@/server/admin/teachers/queries";
 import { updateTeacherProfileSchema, type UpdateTeacherProfileInput } from "@/server/admin/teachers/validation";
 import { listMyClassroomsAsTeacher } from "@/server/teacher/classrooms/queries";
+import type { TeacherListItem } from "@/server/admin/teachers/types";
 
 /**
- * listTeachers() ya no resuelve emails (ver server/admin/teachers/queries.ts): ese paso requiere
- * auth.admin.listUsers() (service_role), así que se pide aparte al backend seguro
- * (GET /api/admin/users/emails) y se combina en memoria -- mismo resultado final que el listado
- * de Next, con un round-trip HTTP adicional en vez de una llamada Admin API server-side.
+ * El email (auth.users, requiere service_role) sigue viniendo del backend seguro
+ * (GET /api/admin/users/emails, sin cambios, performance slice 2 no lo toca) -- pero ya no espera
+ * a que termine el conteo de salones de classroom_teachers para empezar: ambos solo necesitan los
+ * ids de profiles, así que corren en Promise.all en cuanto listTeacherProfiles resuelve. Antes:
+ * profiles -> classroom_teachers -> emails (3 olas). Ahora: profiles -> Promise.all(conteo, emails)
+ * (2 olas) -- mismas 3 requests, ninguna duplicada, mismo shape final (TeacherListItem).
  */
 export function useTeachers() {
   return useQuery({
     queryKey: queryKeys.adminTeachers(),
-    queryFn: async () => {
-      const rows = await listTeachers(supabase, new Map());
-      const ids = rows.map((r) => r.id);
-      if (ids.length === 0) return rows;
-      const { emails } = await secureApiCall<{ emails: Record<string, string | null> }>(`/api/admin/users/emails?ids=${ids.join(",")}`, {
-        method: "GET",
-      });
-      return rows.map((r) => ({ ...r, email: emails[r.id] ?? null }));
+    queryFn: async (): Promise<TeacherListItem[]> => {
+      const profiles = await listTeacherProfiles(supabase);
+      if (profiles.length === 0) return [];
+
+      const ids = profiles.map((p) => p.id);
+      const [countByTeacher, emailById] = await Promise.all([
+        getActiveClassroomCounts(supabase, ids),
+        secureApiCall<{ emails: Record<string, string | null> }>(`/api/admin/users/emails?ids=${ids.join(",")}`, { method: "GET" }).then(
+          (res) => new Map(Object.entries(res.emails))
+        ),
+      ]);
+
+      return profiles.map((p) => toTeacherListItem(p, countByTeacher, emailById));
     },
   });
 }

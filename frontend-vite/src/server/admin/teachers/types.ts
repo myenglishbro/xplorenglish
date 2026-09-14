@@ -9,7 +9,7 @@ export interface TeacherListItem {
   id: string;
   firstName: string;
   lastName: string;
-  /** null si auth.admin.listUsers() no devolvió este id en su página (ver listTeachers). */
+  /** null si auth.admin.listUsers() no devolvió este id en su página (ver useTeachers). */
   email: string | null;
   phone: string;
   hourlyRate: number;

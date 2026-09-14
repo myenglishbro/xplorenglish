@@ -8,7 +8,6 @@ import { Alert } from "@/components/ui/feedback/Alert";
 import { useCreateAvailability, useUpdateAvailability } from "../hooks";
 import { availabilityBlockSchema, type AvailabilityBlockInput } from "../validation";
 import { DAY_OF_WEEK_LABELS, type AvailabilityBlockItem } from "../types";
-import { ApiError } from "@/lib/apiClient";
 
 export interface AvailabilityBlockButtonProps {
   mode: "create" | "edit";
@@ -77,7 +76,7 @@ export function AvailabilityBlockButton({ mode, block, triggerLabel, triggerVari
       }
       setOpen(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No pudimos guardar el bloque. Inténtalo de nuevo en unos minutos.");
+      setError(err instanceof Error ? err.message : "No pudimos guardar el bloque. Inténtalo de nuevo en unos minutos.");
     }
   }
 

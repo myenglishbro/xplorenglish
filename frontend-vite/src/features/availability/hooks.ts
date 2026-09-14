@@ -21,7 +21,7 @@ export function useCreateAvailability() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: (input: AvailabilityBlockInput) => createAvailabilityBlock(input),
+    mutationFn: (input: AvailabilityBlockInput) => createAvailabilityBlock(supabase, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: availabilityKey(user?.id) }),
   });
 }
@@ -30,7 +30,7 @@ export function useUpdateAvailability() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: ({ id, input }: { id: number; input: AvailabilityBlockInput }) => updateAvailabilityBlock(id, input),
+    mutationFn: ({ id, input }: { id: number; input: AvailabilityBlockInput }) => updateAvailabilityBlock(supabase, id, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: availabilityKey(user?.id) }),
   });
 }
@@ -39,7 +39,7 @@ export function useDeleteAvailability() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: (id: number) => deleteAvailabilityBlock(id),
+    mutationFn: (id: number) => deleteAvailabilityBlock(supabase, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: availabilityKey(user?.id) }),
   });
 }

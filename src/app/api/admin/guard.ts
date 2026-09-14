@@ -4,9 +4,10 @@ import type { Database } from "@/types/database.types";
 
 /**
  * Equivalente de requireRole("admin") para Route Handlers autenticados por Bearer (SPA Vite) en
- * vez de cookies -- mismo criterio exacto que src/app/api/teacher/availability/guard.ts (Fase 1):
- * el rol se verifica contra profiles.role del usuario YA autenticado por authenticateBearer()
- * (auth.getUser() real), nunca contra nada que el cliente mande.
+ * vez de cookies -- el rol se verifica contra profiles.role del usuario YA autenticado por
+ * authenticateBearer() (auth.getUser() real), nunca contra nada que el cliente mande. Mismo
+ * criterio que usaba el guard equivalente de teacher/availability antes de que esa mutación se
+ * migrara a Supabase RPC directo (ver 0021_teacher_availability_self_service.sql).
  */
 export async function requireAdminBearer(
   supabase: SupabaseClient<Database>,

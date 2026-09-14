@@ -1354,6 +1354,27 @@ export type Database = {
           payment_id: number
         }[]
       }
+      create_my_teacher_availability: {
+        Args: {
+          p_day_of_week: number
+          p_end_time: string
+          p_start_time: string
+        }
+        Returns: {
+          day_of_week: number
+          end_time: string
+          id: number
+          start_time: string
+          teacher_id: string
+          timezone: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "teacher_availability"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_teacher_payment_period: {
         Args: {
           p_period_end: string
@@ -1377,6 +1398,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      delete_my_teacher_availability: {
+        Args: { p_id: number }
+        Returns: undefined
       }
       initialize_session_attendance: {
         Args: { p_session_id: number }
@@ -1509,6 +1534,28 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_my_teacher_availability: {
+        Args: {
+          p_day_of_week: number
+          p_end_time: string
+          p_id: number
+          p_start_time: string
+        }
+        Returns: {
+          day_of_week: number
+          end_time: string
+          id: number
+          start_time: string
+          teacher_id: string
+          timezone: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "teacher_availability"
           isOneToOne: true
           isSetofReturn: false
         }

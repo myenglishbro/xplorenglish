@@ -1,6 +1,5 @@
 import { ConfirmActionButton } from "@/components/scheduling/ConfirmActionButton";
 import { useDeleteAvailability } from "../hooks";
-import { ApiError } from "@/lib/apiClient";
 
 export function DeleteAvailabilityBlockButton({ blockId, timeRangeLabel }: { blockId: number; timeRangeLabel: string }) {
   const deleteMutation = useDeleteAvailability();
@@ -19,7 +18,7 @@ export function DeleteAvailabilityBlockButton({ blockId, timeRangeLabel }: { blo
           await deleteMutation.mutateAsync(blockId);
           return {};
         } catch (err) {
-          return { error: err instanceof ApiError ? err.message : "No pudimos eliminar el bloque. Inténtalo de nuevo en unos minutos." };
+          return { error: err instanceof Error ? err.message : "No pudimos eliminar el bloque. Inténtalo de nuevo en unos minutos." };
         }
       }}
     />

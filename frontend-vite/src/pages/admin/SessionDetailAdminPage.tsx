@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { useSessionDetail } from "@/features/schedulingAdmin/hooks";
+import { useSessionDetail, useSessionAttendanceRoster } from "@/features/schedulingAdmin/hooks";
 import { useAssignableTeachers } from "@/features/classroomsAdmin/hooks";
 import { Icon } from "@/components/ui/core/Icon";
 import { Card } from "@/components/ui/surfaces/Card";
@@ -7,8 +7,10 @@ import { Spinner } from "@/components/ui/feedback/Spinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { SessionStatusTag } from "@/components/scheduling/SessionStatusTag";
 import { TeacherAssignment } from "@/components/scheduling/TeacherAssignment";
+import { RescheduleSessionButton } from "@/components/scheduling/RescheduleSessionButton";
 import { ReassignTeacherButton } from "@/components/admin/scheduling/ReassignTeacherButton";
 import { CancelSessionButton } from "@/components/admin/scheduling/CancelSessionButton";
+import { AttendanceSection } from "@/components/admin/scheduling/AttendanceSection";
 import { formatLongDateInLima, formatTimeInLima } from "@/lib/datetime/lima";
 
 const CHANGE_TYPE_LABEL: Record<string, string> = {
@@ -16,16 +18,13 @@ const CHANGE_TYPE_LABEL: Record<string, string> = {
   ACTUAL_TEACHER_CHANGED: "Docente real cambiado",
 };
 
-/**
- * Portado de src/app/admin/calendario/[id]/page.tsx. Deliberadamente fuera de este pase:
- * RescheduleSessionButton (reprogramar) y AttendanceSection (asistencia/facturación) -- ver
- * informe final.
- */
+/** Portado de src/app/admin/calendario/[id]/page.tsx. */
 export function SessionDetailAdminPage() {
   const { id } = useParams<{ id: string }>();
   const sessionId = Number(id);
   const { data: session, isLoading, isError } = useSessionDetail(sessionId);
   const teachersQuery = useAssignableTeachers();
+  const attendanceQuery = useSessionAttendanceRoster(sessionId);
   const teacherOptions = (teachersQuery.data ?? []).map((t) => ({ id: t.id, name: `${t.firstName} ${t.lastName}` }));
 
   if (!Number.isFinite(sessionId)) {
@@ -83,6 +82,13 @@ export function SessionDetailAdminPage() {
       {session.status === "scheduled" && (
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
           <ReassignTeacherButton sessionId={session.id} teacherOptions={teacherOptions} />
+          <RescheduleSessionButton
+            sessionId={session.id}
+            classroomId={session.classroomId}
+            scheduledStart={session.scheduledStart}
+            scheduledEnd={session.scheduledEnd}
+            teacherOptions={teacherOptions}
+          />
           <CancelSessionButton sessionId={session.id} />
         </div>
       )}
@@ -124,6 +130,14 @@ export function SessionDetailAdminPage() {
           </div>
         )}
       </Card>
+
+      <AttendanceSection
+        sessionId={session.id}
+        sessionStatus={session.status}
+        actualStart={session.actualStart}
+        actualEnd={session.actualEnd}
+        roster={attendanceQuery.data ?? []}
+      />
     </div>
   );
 }

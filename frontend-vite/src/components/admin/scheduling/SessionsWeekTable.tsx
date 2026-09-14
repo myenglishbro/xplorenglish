@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { DataTable, type DataTableColumn } from "@/components/ui/surfaces/DataTable";
 import { SessionStatusTag } from "@/components/scheduling/SessionStatusTag";
 import { TeacherAssignment } from "@/components/scheduling/TeacherAssignment";
+import { RescheduleSessionButton } from "@/components/scheduling/RescheduleSessionButton";
 import { ReassignTeacherButton } from "./ReassignTeacherButton";
 import { CancelSessionButton } from "./CancelSessionButton";
 import { formatShortDateInLima, formatTimeInLima } from "@/lib/datetime/lima";
@@ -12,11 +13,7 @@ export interface SessionsWeekTableProps {
   teacherOptions: { id: string; name: string }[];
 }
 
-/**
- * Portado de src/components/admin/scheduling/SessionsWeekTable.tsx. "Reprogramar"
- * (RescheduleSessionButton) queda deliberadamente fuera de este pase -- mismo criterio ya
- * aplicado en TeacherSessionsTable (Fase 2): deferido por alcance, no portado todavía.
- */
+/** Portado de src/components/admin/scheduling/SessionsWeekTable.tsx. */
 export function SessionsWeekTable({ sessions, teacherOptions }: SessionsWeekTableProps) {
   const navigate = useNavigate();
 
@@ -64,6 +61,13 @@ export function SessionsWeekTable({ sessions, teacherOptions }: SessionsWeekTabl
         row.status === "scheduled" ? (
           <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", justifyContent: "flex-end", gap: 6, flexWrap: "wrap" }}>
             <ReassignTeacherButton sessionId={row.id} teacherOptions={teacherOptions} />
+            <RescheduleSessionButton
+              sessionId={row.id}
+              classroomId={row.classroomId}
+              scheduledStart={row.scheduledStart}
+              scheduledEnd={row.scheduledEnd}
+              teacherOptions={teacherOptions}
+            />
             <CancelSessionButton sessionId={row.id} />
           </div>
         ) : null,

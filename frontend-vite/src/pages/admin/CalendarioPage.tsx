@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { getWeekRangeInLima } from "@/lib/datetime/lima";
-import { useWeekSessions, useClassroomOptions, usePrimaryTeacherByClassroom } from "@/features/schedulingAdmin/hooks";
+import { useWeekSessions, useClassroomOptions, usePrimaryTeacherByClassroom, useAllClassSchedules } from "@/features/schedulingAdmin/hooks";
 import { useAssignableTeachers } from "@/features/classroomsAdmin/hooks";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { Spinner } from "@/components/ui/feedback/Spinner";
@@ -8,12 +8,10 @@ import { CalendarFilters } from "@/components/admin/scheduling/CalendarFilters";
 import { WeekNav } from "@/components/admin/scheduling/WeekNav";
 import { SessionsWeekTable } from "@/components/admin/scheduling/SessionsWeekTable";
 import { CreateSessionButton } from "@/components/admin/scheduling/CreateSessionButton";
+import { ClassSchedulesButton } from "@/components/admin/scheduling/ClassSchedulesButton";
+import { GenerateSessionsButton } from "@/components/admin/scheduling/GenerateSessionsButton";
 
-/**
- * Portado de src/app/admin/calendario/page.tsx. Deliberadamente fuera de este pase (ver informe
- * final): ClassSchedulesButton (CRUD de horarios semanales), GenerateSessionsButton (generación
- * masiva desde horarios) y RescheduleSessionButton (reprogramar, ya deferido desde Fase 2).
- */
+/** Portado de src/app/admin/calendario/page.tsx. */
 export function CalendarioPage() {
   const [searchParams] = useSearchParams();
   const anchor = searchParams.get("week") ? new Date(`${searchParams.get("week")}T12:00:00Z`) : new Date();
@@ -26,6 +24,7 @@ export function CalendarioPage() {
   const classroomsQuery = useClassroomOptions();
   const teachersQuery = useAssignableTeachers();
   const primaryTeacherQuery = usePrimaryTeacherByClassroom();
+  const schedulesQuery = useAllClassSchedules();
 
   const classrooms = classroomsQuery.data ?? [];
   const teachers = teachersQuery.data ?? [];
@@ -46,6 +45,8 @@ export function CalendarioPage() {
         </h1>
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
           <CreateSessionButton classrooms={classrooms} teacherOptions={teacherOptions} primaryTeacherByClassroom={primaryTeacherQuery.data ?? {}} />
+          <ClassSchedulesButton classrooms={classrooms} schedules={schedulesQuery.data ?? []} />
+          <GenerateSessionsButton classrooms={classrooms} />
         </div>
       </div>
 

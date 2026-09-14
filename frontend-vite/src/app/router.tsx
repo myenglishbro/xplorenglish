@@ -2,8 +2,29 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { LoginPage } from "@/pages/LoginPage";
 import { TeacherLayout } from "@/layouts/TeacherLayout";
 import { StudentLayout } from "@/layouts/StudentLayout";
+import { AdminLayout } from "@/layouts/AdminLayout";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
 import { SalonDetailPage } from "@/pages/SalonDetailPage";
+
+import { DashboardPage } from "@/pages/admin/DashboardPage";
+import { UsersListPage } from "@/pages/admin/UsersListPage";
+import { UserDetailPage } from "@/pages/admin/UserDetailPage";
+import { EstudiantesListPage } from "@/pages/admin/EstudiantesListPage";
+import { NuevoEstudiantePage } from "@/pages/admin/NuevoEstudiantePage";
+import { DocentesListPage } from "@/pages/admin/DocentesListPage";
+import { DocenteDetailPage } from "@/pages/admin/DocenteDetailPage";
+import { SalonesPage } from "@/pages/admin/SalonesPage";
+import { NuevoSalonPage } from "@/pages/admin/NuevoSalonPage";
+import { SalonDetailAdminPage } from "@/pages/admin/SalonDetailAdminPage";
+import { PaquetesPage } from "@/pages/admin/PaquetesPage";
+import { ReportesPage } from "@/pages/admin/ReportesPage";
+import { ConfiguracionPage } from "@/pages/admin/ConfiguracionPage";
+import { PagosEstudiantesListPage } from "@/pages/admin/PagosEstudiantesListPage";
+import { PagoEstudianteDetailPage } from "@/pages/admin/PagoEstudianteDetailPage";
+import { PagosDocentesListPage } from "@/pages/admin/PagosDocentesListPage";
+import { PagoDocentePeriodoDetailPage } from "@/pages/admin/PagoDocentePeriodoDetailPage";
+import { CalendarioPage } from "@/pages/admin/CalendarioPage";
+import { SessionDetailAdminPage } from "@/pages/admin/SessionDetailAdminPage";
 
 import { TeacherHomePage } from "@/pages/teacher/TeacherHomePage";
 import { AvailabilityPage } from "@/pages/teacher/AvailabilityPage";
@@ -57,7 +78,35 @@ export const router = createBrowserRouter([
       { path: "test-de-nivel", element: <StudentTestDeNivelPage /> },
     ],
   },
-  // Fase 2/3: admin todavía vive en el Next viejo (ver LoginPage/ProtectedRoute: hard-redirect).
+  {
+    path: "/admin",
+    element: (
+      <ProtectedRoute allowedRoles={["admin"]}>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <DashboardPage /> },
+      { path: "usuarios", element: <UsersListPage /> },
+      { path: "usuarios/:id", element: <UserDetailPage /> },
+      { path: "estudiantes", element: <EstudiantesListPage /> },
+      { path: "estudiantes/nuevo", element: <NuevoEstudiantePage /> },
+      { path: "docentes", element: <DocentesListPage /> },
+      { path: "docentes/:id", element: <DocenteDetailPage /> },
+      { path: "salones", element: <SalonesPage /> },
+      { path: "salones/nuevo", element: <NuevoSalonPage /> },
+      { path: "salones/:id", element: <SalonDetailAdminPage /> },
+      { path: "calendario", element: <CalendarioPage /> },
+      { path: "calendario/:id", element: <SessionDetailAdminPage /> },
+      { path: "paquetes", element: <PaquetesPage /> },
+      { path: "pagos-estudiantes", element: <PagosEstudiantesListPage /> },
+      { path: "pagos-estudiantes/:id", element: <PagoEstudianteDetailPage /> },
+      { path: "pagos-docentes", element: <PagosDocentesListPage /> },
+      { path: "pagos-docentes/:id", element: <PagoDocentePeriodoDetailPage /> },
+      { path: "reportes", element: <ReportesPage /> },
+      { path: "configuracion", element: <ConfiguracionPage /> },
+    ],
+  },
   { path: "/", element: <Navigate to="/login" replace /> },
   { path: "*", element: <Navigate to="/login" replace /> },
 ]);

@@ -10,7 +10,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public code?: string
+    public code?: string,
+    public fieldErrors?: Record<string, string>
   ) {
     super(message);
     this.name = "ApiError";
@@ -24,7 +25,7 @@ export class ApiError extends Error {
  * que RLS + requireActiveTeacherId() decidan, nunca confía en nada que mande este cliente aparte
  * del token.
  */
-export async function secureApiCall<T>(path: string, options: { method: "POST" | "PATCH" | "DELETE"; body?: unknown }): Promise<T> {
+export async function secureApiCall<T>(path: string, options: { method: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown }): Promise<T> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -50,11 +51,10 @@ export async function secureApiCall<T>(path: string, options: { method: "POST" |
   }
 
   if (!res.ok) {
-    const message =
-      payload && typeof payload === "object" && "error" in payload && typeof (payload as { error?: unknown }).error === "string"
-        ? (payload as { error: string }).error
-        : `Error ${res.status}`;
-    throw new ApiError(message, res.status);
+    const body = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+    const message = typeof body.error === "string" ? body.error : `Error ${res.status}`;
+    const fieldErrors = body.fieldErrors && typeof body.fieldErrors === "object" ? (body.fieldErrors as Record<string, string>) : undefined;
+    throw new ApiError(message, res.status, undefined, fieldErrors);
   }
 
   return payload as T;

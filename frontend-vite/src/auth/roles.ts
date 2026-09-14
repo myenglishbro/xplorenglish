@@ -9,7 +9,7 @@ export const ROLE_HOME_PATH: Record<UserRole, string> = {
   student: "/student",
 };
 
-/** Roles cuyas rutas ya viven en este SPA (Fase 2/3: teacher + student). admin sigue en el Next
- * viejo -- cualquier rol fuera de esta lista recibe un salto duro (ver LoginPage/ProtectedRoute),
- * nunca un `navigate()` interno (este router no tiene rutas para esos roles). */
-export const MIGRATED_ROLES: UserRole[] = ["teacher", "student"];
+/** Roles cuyas rutas ya viven en este SPA (Fase 2/3: teacher + student; Fase 4: admin). Cualquier
+ * rol fuera de esta lista recibe un salto duro (ver LoginPage/ProtectedRoute), nunca un
+ * `navigate()` interno (este router no tiene rutas para esos roles). */
+export const MIGRATED_ROLES: UserRole[] = ["teacher", "student", "admin"];

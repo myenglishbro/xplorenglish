@@ -121,7 +121,10 @@ export async function getSessionDetail(supabase: Client, sessionId: number): Pro
   if (changesError) throw changesError;
 
   const nameIds = changeRows.flatMap((r) => [r.previous_teacher_id, r.new_teacher_id, r.changed_by].filter((id): id is string => !!id));
-  const names = await fetchProfileNames(supabase, [...nameIds, sessionRow.scheduled_teacher_id, sessionRow.actual_teacher_id ?? ""]);
+  const names = await fetchProfileNames(
+    supabase,
+    [...nameIds, sessionRow.scheduled_teacher_id, sessionRow.actual_teacher_id].filter((id): id is string => !!id)
+  );
 
   const teacherChanges: SessionTeacherChangeItem[] = changeRows.map((row) => ({
     id: row.id,

@@ -114,6 +114,9 @@ const ASSIGN_PRIMARY_ERROR_MESSAGES: Record<string, string> = {
   CLASSROOM_NOT_FOUND: "El salón no existe.",
   TEACHER_NOT_FOUND: "Ese usuario no es un docente.",
   TEACHER_INACTIVE: "Ese docente está inactivo; actívalo antes de asignarlo como titular.",
+  NO_AVAILABILITY: "Ese docente no tiene disponibilidad registrada.",
+  INSUFFICIENT_AVAILABILITY: "La disponibilidad del docente no cubre el horario del salón.",
+  SCHEDULE_CONFLICT: "Ese docente ya tiene un compromiso que se solapa con este horario.",
 };
 
 /**

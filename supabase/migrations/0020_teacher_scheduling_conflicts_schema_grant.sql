@@ -1,0 +1,28 @@
+-- Dominio: fix puntual sobre 0019 (invariante de disponibilidad/conflictos docentes)
+-- Depende de: 0001 (schema private, "revoke all on schema private from public, anon,
+--             authenticated" -- nunca se volvió a otorgar USAGE), 0019
+--
+-- Encontrado probando directo contra el backend (no solo desde React, como pide el punto 8 del
+-- MVP): assign_classroom_primary_teacher (SECURITY INVOKER) falla con
+-- "permission denied for schema private" al llamar a private.validate_teacher_weekly_block, pese
+-- a que 0019 ya le otorgó EXECUTE a authenticated sobre esa función puntual.
+--
+-- Causa real: en Postgres, invocar `schema.función()` exige DOS privilegios distintos -- USAGE
+-- sobre el schema (para poder siquiera resolver el nombre calificado) Y EXECUTE sobre la función.
+-- 0001 revocó USAGE sobre `private` de authenticated y nunca se volvió a otorgar, porque hasta
+-- ahora NINGUNA función SECURITY INVOKER llamaba directo a private.* -- únicamente lo hacían
+-- policies de RLS y funciones SECURITY DEFINER (classroom_primary_teacher_name, reschedule_session,
+-- etc.), que no dependen del USAGE del rol invocador para sus llamadas internas. 0019 introdujo el
+-- primer caso real de una función SECURITY INVOKER (assign_classroom_primary_teacher,
+-- change_session_teacher) llamando directo a un helper en `private` -- por eso el hueco recién
+-- ahora se manif
+
+--
+-- Por qué este grant es seguro (no debilita nada): USAGE sobre un schema solo permite RESOLVER
+-- nombres calificados dentro de él -- no ejecuta nada por sí solo. Seguir necesitando el GRANT
+-- EXECUTE explícito por función (ya existente, por función, desde 0005/0015/0019) significa que
+-- este grant no amplía qué se puede invocar, solo destraba la resolución de nombre para lo que ya
+-- estaba explícitamente permitido. PostgREST además solo enruta /rest/v1/rpc/* al schema `public`
+-- -- `private` nunca queda expuesto como API sin importar este grant. No toca RLS, no toca
+-- policies, no expone service_role.
+grant usage on schema private to authenticated;

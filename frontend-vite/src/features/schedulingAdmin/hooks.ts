@@ -72,6 +72,10 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   TEACHER_INACTIVE: "Ese docente está inactivo.",
   INVALID_CHANGE_TYPE: "Tipo de cambio no reconocido.",
   INVALID_SESSION_STATUS: "La sesión no está en un estado válido para esta acción.",
+  INVALID_TIME_RANGE: "El horario ingresado no es válido.",
+  NO_AVAILABILITY: "Ese docente no tiene disponibilidad registrada.",
+  INSUFFICIENT_AVAILABILITY: "La disponibilidad del docente no cubre ese horario.",
+  SCHEDULE_CONFLICT: "Ese docente ya tiene un compromiso que se solapa con este horario.",
 };
 
 function parseRpcError(error: { message: string }): string {
@@ -193,18 +197,21 @@ export function useCreateClassSchedule(classroomId: number) {
       const { error } = await supabase
         .from("class_schedules")
         .insert({ classroom_id: classroomId, day_of_week: parsed.data.dayOfWeek, start_time: parsed.data.startTime, end_time: parsed.data.endTime });
-      if (error) throw new Error("No pudimos crear el horario. Inténtalo de nuevo en unos minutos.");
+      if (error) throw new Error(parseRpcError(error));
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.adminAllClassSchedules() }),
   });
 }
 
+/** Activar/editar un horario cuando el salón ya tiene PRIMARY revalida su compatibilidad
+ * server-side (trigger class_schedules_check_primary_compatibility, 0019) -- por eso este error
+ * también se traduce con parseRpcError en vez del mensaje genérico anterior. */
 export function useSetClassScheduleActive() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ scheduleId, isActive }: { scheduleId: number; isActive: boolean }) => {
       const { error } = await supabase.from("class_schedules").update({ is_active: isActive }).eq("id", scheduleId);
-      if (error) throw new Error("No pudimos actualizar el horario. Inténtalo de nuevo en unos minutos.");
+      if (error) throw new Error(parseRpcError(error));
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.adminAllClassSchedules() }),
   });

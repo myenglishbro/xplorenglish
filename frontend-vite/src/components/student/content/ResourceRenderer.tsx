@@ -34,6 +34,32 @@ const IFRAME_ALLOW: Record<KnownProviderType | "embed", string | undefined> = {
   embed: undefined,
 };
 
+/**
+ * Sandbox por proveedor -- antes solo se aplicaba al caso dormant 'embed', dejando los 5
+ * proveedores conocidos (el 99.9% real de los recursos) sin ningún sandbox. `allow-scripts` +
+ * `allow-same-origin` son imprescindibles para que los reproductores/visores de terceros
+ * funcionen (YouTube/Vimeo necesitan su propio JS; los visores de Drive/Docs/Slides también) --
+ * la combinación es un trade-off aceptado por los propios proveedores para embeds legítimos.
+ * Lo que SÍ se retiene siempre: nunca `allow-top-navigation` ni `allow-modals`, así que el iframe
+ * no puede navegar ni bloquear la pestaña del salón. `allow-popups` solo porque estos
+ * reproductores a veces abren "ver en YouTube/Drive" en pestaña nueva -- eso es exactamente el
+ * fallback que igual ofrecemos explícitamente abajo del iframe.
+ */
+const IFRAME_SANDBOX: Record<KnownProviderType | "embed", string> = {
+  youtube: "allow-scripts allow-same-origin allow-presentation allow-popups",
+  vimeo: "allow-scripts allow-same-origin allow-popups",
+  drive: "allow-scripts allow-same-origin allow-popups allow-forms",
+  docs: "allow-scripts allow-same-origin allow-popups allow-forms",
+  slides: "allow-scripts allow-same-origin allow-popups allow-forms",
+  embed: "allow-scripts allow-same-origin allow-popups allow-forms",
+};
+
+/** Mismo valor para los 5 -- no hay razón real para variarlo por proveedor: nunca se manda el
+ * origin completo (mucho menos la URL con query) a un tercero, solo el origin cuando el destino
+ * es igual de seguro (https->https). Es además el default moderno de los navegadores; se declara
+ * explícito para no depender de eso. */
+const IFRAME_REFERRER_POLICY = "strict-origin-when-cross-origin" as const;
+
 /** Video (16:9, ancho acotado) vs. documento/presentación (visor amplio, alto fijo) -- misma
  * distinción que pidió el rediseño: un video no necesita todo el ancho del panel, un documento sí. */
 const IS_VIDEO: Record<KnownProviderType | "embed", boolean> = {
@@ -112,15 +138,41 @@ export function ResourceRenderer({ resource }: { resource: ResourceItem }) {
             loading="lazy"
             allow={IFRAME_ALLOW[providerType]}
             allowFullScreen
+            referrerPolicy={IFRAME_REFERRER_POLICY}
             // La URL del iframe siempre la construye esta función a partir de un proveedor
             // conocido, o -- solo para el caso dormant 'embed' -- de una URL que ya eligió un
             // admin al crear el recurso. Nunca HTML pegado por nadie, nunca dangerouslySetInnerHTML.
-            sandbox={providerType === "embed" ? "allow-scripts allow-same-origin allow-popups allow-forms" : undefined}
+            sandbox={IFRAME_SANDBOX[providerType]}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
           />
         </div>
+        {/* Fallback siempre visible, no solo "si falla": un archivo de Drive/Docs/Slides sin
+            permisos públicos no dispara ningún error de carga detectable (Google renderiza su
+            propio mensaje de "sin acceso" DENTRO del iframe, que sigue cargando con éxito) -- la
+            única forma confiable de no dejar al estudiante varado es ofrecer siempre el enlace
+            directo, en vez de intentar adivinar si el embed "falló". */}
+        <div style={{ marginTop: "var(--space-2)" }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="arrow-square-out"
+            onClick={() => window.open(resource.reference, "_blank", "noopener,noreferrer")}
+          >
+            Abrir en una nueva pestaña
+          </Button>
+        </div>
       </div>
     );
+  }
+
+  // URL genérica: nunca se convierte en iframe (fuera del allowlist de detectKnownProvider), solo
+  // se usa para mostrar el dominio en la tarjeta -- si ni siquiera es una URL parseable, se omite
+  // el dominio en vez de romper el render.
+  let domain: string | null = null;
+  try {
+    domain = new URL(resource.reference).hostname.replace(/^www\./, "");
+  } catch {
+    domain = null;
   }
 
   return (
@@ -154,16 +206,31 @@ export function ResourceRenderer({ resource }: { resource: ResourceItem }) {
           >
             <Icon name="link-simple" size={17} color="var(--cyan-700)" />
           </span>
-          <span
-            style={{
-              font: "var(--weight-semibold) var(--text-body-size)/1.3 var(--font-body)",
-              color: "var(--text-heading)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {resource.title}
+          <span style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 2 }}>
+            <span
+              style={{
+                font: "var(--weight-semibold) var(--text-body-size)/1.3 var(--font-body)",
+                color: "var(--text-heading)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {resource.title}
+            </span>
+            {domain && (
+              <span
+                style={{
+                  font: "var(--weight-regular) var(--text-caption-size)/1 var(--font-body)",
+                  color: "var(--text-subtle)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {domain}
+              </span>
+            )}
           </span>
         </span>
         <Button

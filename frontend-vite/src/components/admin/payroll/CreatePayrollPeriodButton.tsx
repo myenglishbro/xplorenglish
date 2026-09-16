@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "@/components/ui/core/Button";
+import { Button, type ButtonVariant, type ButtonSize } from "@/components/ui/core/Button";
 import { Modal } from "@/components/ui/surfaces/Modal";
 import { Field } from "@/components/ui/forms/Field";
 import { Input } from "@/components/ui/forms/Input";
@@ -9,6 +9,13 @@ import { useCreatePayrollPeriod, type CreatePayrollPeriodFieldErrors } from "@/f
 
 export interface CreatePayrollPeriodButtonProps {
   teachers: { id: string; firstName: string; lastName: string }[];
+  /** Preselecciona el docente -- usado desde la fila "Crear periodo" del resumen de deuda
+   * (TeacherDebtSummary, Slice 3), donde el docente ya se conoce de antemano. El <Select> sigue
+   * editable: es solo un valor inicial, nunca un mecanismo de pago distinto al de siempre. */
+  defaultTeacherId?: string;
+  triggerLabel?: string;
+  triggerVariant?: ButtonVariant;
+  triggerSize?: ButtonSize;
 }
 
 /**
@@ -16,12 +23,18 @@ export interface CreatePayrollPeriodButtonProps {
  * total_minutes/total_amount ni decide qué horas entran: eso lo resuelve el RPC leyendo
  * teacher_hours_log directamente. Si no hay horas elegibles, el RPC devuelve NO_ELIGIBLE_HOURS.
  */
-export function CreatePayrollPeriodButton({ teachers }: CreatePayrollPeriodButtonProps) {
+export function CreatePayrollPeriodButton({
+  teachers,
+  defaultTeacherId = "",
+  triggerLabel = "Crear periodo de pago",
+  triggerVariant = "primary",
+  triggerSize = "md",
+}: CreatePayrollPeriodButtonProps) {
   const formId = React.useId();
   const mutation = useCreatePayrollPeriod();
   const [open, setOpen] = React.useState(false);
   const [fieldErrors, setFieldErrors] = React.useState<CreatePayrollPeriodFieldErrors>({});
-  const [teacherId, setTeacherId] = React.useState("");
+  const [teacherId, setTeacherId] = React.useState(defaultTeacherId);
   const [periodStart, setPeriodStart] = React.useState("");
   const [periodEnd, setPeriodEnd] = React.useState("");
 
@@ -32,7 +45,7 @@ export function CreatePayrollPeriodButton({ teachers }: CreatePayrollPeriodButto
 
   function handleOpen() {
     setFieldErrors({});
-    setTeacherId("");
+    setTeacherId(defaultTeacherId);
     setPeriodStart("");
     setPeriodEnd("");
     setOpen(true);
@@ -54,8 +67,8 @@ export function CreatePayrollPeriodButton({ teachers }: CreatePayrollPeriodButto
 
   return (
     <>
-      <Button variant="primary" icon="plus" onClick={handleOpen}>
-        Crear periodo de pago
+      <Button variant={triggerVariant} size={triggerSize} icon="plus" onClick={handleOpen}>
+        {triggerLabel}
       </Button>
       <Modal
         open={open}

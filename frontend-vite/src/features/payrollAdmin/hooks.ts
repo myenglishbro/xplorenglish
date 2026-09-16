@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
-import { listPayrollPeriods, getPayrollPeriodDetail } from "@/server/payroll/queries";
+import { listPayrollPeriods, getPayrollPeriodDetail, listTeacherDebtSummary } from "@/server/payroll/queries";
 import { createPayrollPeriodSchema, type CreatePayrollPeriodInput } from "@/server/payroll/validation";
 
 /** listPayrollPeriods() sin filtro -- RLS (teacher_payment_periods_select, 0008) ya devuelve
@@ -19,6 +19,16 @@ export function useAdminPayrollPeriodDetail(periodId: number) {
     queryKey: queryKeys.payrollPeriodDetail(periodId),
     queryFn: () => getPayrollPeriodDetail(supabase, periodId),
     enabled: Number.isFinite(periodId),
+  });
+}
+
+/** "¿Cuánto debo?" -- automático, sin filtros (Slice 3). Independiente de useAdminPayrollPeriods:
+ * esta no lee teacher_payment_periods como lista, agrega teacher_hours_log directamente (ver
+ * listTeacherDebtSummary). */
+export function useTeacherDebtSummary() {
+  return useQuery({
+    queryKey: queryKeys.adminTeacherDebtSummary(),
+    queryFn: () => listTeacherDebtSummary(supabase),
   });
 }
 
@@ -68,13 +78,23 @@ export function useCreatePayrollPeriod() {
       });
       if (error) throw new Error(messageFor(error));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.adminPayrollPeriods() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPayrollPeriods() });
+      // Agrupar horas en un periodo no cambia generado/pagado/pendiente (el periodo nace
+      // 'pending', no 'paid'), pero si el resumen de deuda ya se leyó antes de crear este periodo,
+      // más vale invalidar igual: es una query barata y evita cualquier duda de estado stale.
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminTeacherDebtSummary() });
+    },
   });
 }
 
 function invalidatePeriod(queryClient: ReturnType<typeof useQueryClient>, periodId: number) {
   queryClient.invalidateQueries({ queryKey: queryKeys.adminPayrollPeriods() });
   queryClient.invalidateQueries({ queryKey: queryKeys.payrollPeriodDetail(periodId) });
+  // approve_teacher_payment_period no cambia dinero (solo status pending->approved, sigue sin
+  // pagar); mark_teacher_payment_period_paid sí (status->paid), lo que mueve el importe de
+  // "pendiente" a "pagado" en el resumen -- invalidar en ambos casos es correcto y barato.
+  queryClient.invalidateQueries({ queryKey: queryKeys.adminTeacherDebtSummary() });
 }
 
 export function useApprovePayrollPeriod(periodId: number) {

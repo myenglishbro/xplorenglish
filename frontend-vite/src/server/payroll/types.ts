@@ -70,3 +70,21 @@ export interface PayrollPeriodDetail {
   hours: PayrollHourItem[];
   receipt: PayrollReceiptSummary | null;
 }
+
+export interface TeacherDebtSummaryItem {
+  [key: string]: unknown;
+  teacherId: string;
+  teacherName: string;
+  /** SUM(teacher_hours_log.amount) del docente -- todo lo generado históricamente, sin importar
+   * si ya se agrupó en un periodo o se pagó. */
+  generatedAmount: number;
+  /** SUM(teacher_hours_log.amount) cuyo teacher_payment_periods.status = 'paid' -- únicamente
+   * 'paid' cuenta como pagado (pending/pending_receipt/receipt_uploaded/approved siguen siendo
+   * deuda). */
+  paidAmount: number;
+  /** generatedAmount - paidAmount, calculado en centavos enteros para que la igualdad sea exacta. */
+  pendingAmount: number;
+  /** sessions.actual_end (fallback actual_start) de la sesión más reciente que generó costo para
+   * este docente -- null si nunca dictó ninguna. Nunca teacher_hours_log.created_at. */
+  lastClassAt: string | null;
+}

@@ -50,6 +50,71 @@ export function getTodayRangeInLima(now: Date = new Date()): { start: Date; end:
   return { start, end };
 }
 
+/**
+ * Rango de fechas para reportes financieros -- deliberadamente expone AMBAS formas, para dos
+ * familias de columnas que no deben mezclarse:
+ *   - `start`/`end`: instantes UTC reales, semiabierto [start, end) -- para columnas timestamptz
+ *     (student_payments.paid_at, teacher_payment_periods.paid_at, sessions.actual_end).
+ *   - `startDate`/`endDate`: strings "YYYY-MM-DD" puros, AMBOS INCLUSIVE -- para columnas `date`
+ *     sin zona horaria (business_expenses.expense_date), donde comparar contra un instante
+ *     timestamptz sería incorrecto (Postgres castea `date` a medianoche UTC, no a medianoche
+ *     Lima, produciendo un desfase de 5 horas en el primer/último día). Mismo criterio inclusive
+ *     que `teacher_payment_periods.period_start/period_end` (0008) y su uso `between` en
+ *     `create_teacher_payment_period` (0009).
+ */
+export interface LimaDateRange {
+  start: Date;
+  end: Date;
+  startDate: string;
+  endDate: string;
+}
+
+/**
+ * [start, end) del mes calendario en America/Lima que contiene `anchorDate`, en ambas formas
+ * (ver LimaDateRange). Mismo patrón que getWeekRangeInLima: componentes de calendario en hora de
+ * pared Lima, nunca aritmética de milisegundos sobre "cuántos días tiene el mes" -- `Date.UTC(year,
+ * month+1, 0)` es el truco estándar para obtener el último día del mes sin tabla de días.
+ */
+export function getMonthRangeInLima(anchorDate: Date = new Date()): LimaDateRange {
+  const offsetMinutes = getLimaOffsetMinutes(anchorDate);
+  const limaWallNow = new Date(anchorDate.getTime() + offsetMinutes * 60_000);
+  const year = limaWallNow.getUTCFullYear();
+  const month = limaWallNow.getUTCMonth();
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const startDate = `${year}-${pad(month + 1)}-01`;
+  const endDate = `${year}-${pad(month + 1)}-${pad(lastDay)}`;
+
+  const limaMidnightFirstAsUtc = Date.UTC(year, month, 1, 0, 0, 0, 0);
+  const start = new Date(limaMidnightFirstAsUtc - offsetMinutes * 60_000);
+
+  // Medianoche de pared Lima del día SIGUIENTE al último día del mes -- Date.UTC normaliza el
+  // desborde de mes/año automáticamente (ej. month+1 en diciembre pasa a enero del año siguiente).
+  const limaMidnightAfterLastAsUtc = Date.UTC(year, month + 1, 1, 0, 0, 0, 0);
+  const end = new Date(limaMidnightAfterLastAsUtc - offsetMinutes * 60_000);
+
+  return { start, end, startDate, endDate };
+}
+
+/**
+ * Rango personalizado a partir de dos fechas de pared "YYYY-MM-DD" (ambas inclusive, mismo
+ * criterio que period_start/period_end) -- para el selector de rango del futuro Reportes. `end`
+ * (instante UTC) es la medianoche de pared Lima del día SIGUIENTE a `endDate`, para mantener el
+ * mismo semiabierto [start, end) que el resto del módulo.
+ */
+export function getCustomRangeInLima(startDate: string, endDate: string): LimaDateRange {
+  const start = limaWallClockToUtc(startDate, "00:00");
+
+  const [y, m, d] = endDate.split("-").map(Number);
+  const dayAfterEnd = new Date(Date.UTC(y as number, (m as number) - 1, (d as number) + 1));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dayAfterEndStr = `${dayAfterEnd.getUTCFullYear()}-${pad(dayAfterEnd.getUTCMonth() + 1)}-${pad(dayAfterEnd.getUTCDate())}`;
+  const end = limaWallClockToUtc(dayAfterEndStr, "00:00");
+
+  return { start, end, startDate, endDate };
+}
+
 export function formatTimeInLima(iso: string): string {
   return new Intl.DateTimeFormat("es-PE", { timeZone: LIMA_TZ, hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 }

@@ -31,6 +31,7 @@ export const queryKeys = {
   adminStudentPayments: (filters: { studentId?: string; status?: string }) => ["admin-student-payments", filters] as const,
   adminPaymentDetail: (id: number) => ["admin-payment", id] as const,
   adminPayrollPeriods: () => ["admin-payroll-periods"] as const,
+  adminTeacherDebtSummary: () => ["admin-teacher-debt-summary"] as const,
   adminWeekSessions: (filters: { weekStart: string; weekEnd: string; classroomId?: number; teacherId?: string }) =>
     ["admin-week-sessions", filters] as const,
   adminClassroomOptions: () => ["admin-classroom-options"] as const,
@@ -41,4 +42,10 @@ export const queryKeys = {
   adminSessionAttendanceRoster: (id: number) => ["admin-session-attendance", id] as const,
   adminHourPackages: () => ["admin-hour-packages"] as const,
   adminStudentHoursMovements: (studentId: string) => ["admin-student-hours-movements", studentId] as const,
+  adminExpenses: () => ["admin-expenses"] as const,
+  /** Prefijo estable "admin-financial-report" -- las mutaciones de gastos invalidan por prefijo
+   * (sin startDate/endDate) para refrescar el reporte sin importar qué periodo esté viendo el
+   * admin en ese momento; ver features/expensesAdmin/hooks.ts. */
+  adminFinancialReport: (startDate: string, endDate: string) => ["admin-financial-report", startDate, endDate] as const,
+  adminFinancialTrend: (monthsBack: number) => ["admin-financial-trend", monthsBack] as const,
 };

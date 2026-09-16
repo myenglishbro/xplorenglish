@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       account_invitations: {
@@ -70,6 +45,53 @@ export type Database = {
             foreignKeyName: "account_invitations_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_expenses: {
+        Row: {
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string
+          created_by: string
+          description: string
+          expense_date: string
+          id: number
+          notes: string | null
+          payment_method: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          created_by: string
+          description: string
+          expense_date: string
+          id?: never
+          notes?: string | null
+          payment_method: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          created_by?: string
+          description?: string
+          expense_date?: string
+          id?: never
+          notes?: string | null
+          payment_method?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1406,7 +1428,7 @@ export type Database = {
       get_user_emails: {
         Args: { p_user_ids: string[] }
         Returns: {
-          email: string | null
+          email: string
           user_id: string
         }[]
       }
@@ -1579,6 +1601,16 @@ export type Database = {
       academic_level: "A1" | "A2" | "B1" | "B2" | "C1" | "C2"
       attendance_status: "present" | "absent" | "cancelled" | "rescheduled"
       classroom_teacher_role: "PRIMARY" | "SUBSTITUTE"
+      expense_category:
+        | "marketing"
+        | "software"
+        | "services"
+        | "rent"
+        | "equipment"
+        | "materials"
+        | "administration"
+        | "taxes"
+        | "other"
       hours_movement_type:
         | "purchase"
         | "consumption"
@@ -1739,14 +1771,22 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       academic_level: ["A1", "A2", "B1", "B2", "C1", "C2"],
       attendance_status: ["present", "absent", "cancelled", "rescheduled"],
       classroom_teacher_role: ["PRIMARY", "SUBSTITUTE"],
+      expense_category: [
+        "marketing",
+        "software",
+        "services",
+        "rent",
+        "equipment",
+        "materials",
+        "administration",
+        "taxes",
+        "other",
+      ],
       hours_movement_type: [
         "purchase",
         "consumption",

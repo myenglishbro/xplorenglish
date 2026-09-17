@@ -50,6 +50,50 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          admin_user_id: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: number
+          new_data: Json | null
+          previous_data: Json | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          admin_user_id?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: never
+          new_data?: Json | null
+          previous_data?: Json | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: never
+          new_data?: Json | null
+          previous_data?: Json | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_admin_user_id_fkey"
+            columns: ["admin_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_expenses: {
         Row: {
           amount: number
@@ -97,6 +141,86 @@ export type Database = {
           },
         ]
       }
+      class_records: {
+        Row: {
+          amount: number | null
+          classroom_id: number
+          created_at: string
+          hourly_rate_snapshot: number | null
+          id: number
+          idempotency_key: string
+          minutes: number
+          notes: string | null
+          occurred_at: string
+          status: Database["public"]["Enums"]["class_record_status"]
+          student_id: string
+          teacher_id: string
+          teacher_payment_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number | null
+          classroom_id: number
+          created_at?: string
+          hourly_rate_snapshot?: number | null
+          id?: never
+          idempotency_key: string
+          minutes: number
+          notes?: string | null
+          occurred_at: string
+          status: Database["public"]["Enums"]["class_record_status"]
+          student_id: string
+          teacher_id: string
+          teacher_payment_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number | null
+          classroom_id?: number
+          created_at?: string
+          hourly_rate_snapshot?: number | null
+          id?: never
+          idempotency_key?: string
+          minutes?: number
+          notes?: string | null
+          occurred_at?: string
+          status?: Database["public"]["Enums"]["class_record_status"]
+          student_id?: string
+          teacher_id?: string
+          teacher_payment_id?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_records_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_records_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_records_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_profiles"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "class_records_teacher_payment_id_fkey"
+            columns: ["teacher_payment_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_schedules: {
         Row: {
           classroom_id: number
@@ -135,42 +259,6 @@ export type Database = {
           },
         ]
       }
-      classroom_students: {
-        Row: {
-          classroom_id: number
-          enrolled_at: string
-          status: Database["public"]["Enums"]["membership_status"]
-          student_id: string
-        }
-        Insert: {
-          classroom_id: number
-          enrolled_at?: string
-          status?: Database["public"]["Enums"]["membership_status"]
-          student_id: string
-        }
-        Update: {
-          classroom_id?: number
-          enrolled_at?: string
-          status?: Database["public"]["Enums"]["membership_status"]
-          student_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "classroom_students_classroom_id_fkey"
-            columns: ["classroom_id"]
-            isOneToOne: false
-            referencedRelation: "classrooms"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "classroom_students_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       classroom_teachers: {
         Row: {
           assigned_at: string
@@ -178,7 +266,6 @@ export type Database = {
           id: number
           status: Database["public"]["Enums"]["membership_status"]
           teacher_id: string
-          teacher_role: Database["public"]["Enums"]["classroom_teacher_role"]
         }
         Insert: {
           assigned_at?: string
@@ -186,7 +273,6 @@ export type Database = {
           id?: never
           status?: Database["public"]["Enums"]["membership_status"]
           teacher_id: string
-          teacher_role: Database["public"]["Enums"]["classroom_teacher_role"]
         }
         Update: {
           assigned_at?: string
@@ -194,7 +280,6 @@ export type Database = {
           id?: never
           status?: Database["public"]["Enums"]["membership_status"]
           teacher_id?: string
-          teacher_role?: Database["public"]["Enums"]["classroom_teacher_role"]
         }
         Relationships: [
           {
@@ -223,6 +308,7 @@ export type Database = {
           program_id: number
           schedule_notes: string | null
           status: string
+          student_id: string | null
         }
         Insert: {
           created_at?: string
@@ -233,6 +319,7 @@ export type Database = {
           program_id: number
           schedule_notes?: string | null
           status?: string
+          student_id?: string | null
         }
         Update: {
           created_at?: string
@@ -243,6 +330,7 @@ export type Database = {
           program_id?: number
           schedule_notes?: string | null
           status?: string
+          student_id?: string | null
         }
         Relationships: [
           {
@@ -252,10 +340,18 @@ export type Database = {
             referencedRelation: "programs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "classrooms_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       hours_movements: {
         Row: {
+          class_record_id: number | null
           created_at: string
           created_by: string
           id: number
@@ -263,10 +359,10 @@ export type Database = {
           movement_type: Database["public"]["Enums"]["hours_movement_type"]
           notes: string | null
           package_id: number | null
-          session_attendance_id: number | null
           student_id: string
         }
         Insert: {
+          class_record_id?: number | null
           created_at?: string
           created_by: string
           id?: never
@@ -274,10 +370,10 @@ export type Database = {
           movement_type: Database["public"]["Enums"]["hours_movement_type"]
           notes?: string | null
           package_id?: number | null
-          session_attendance_id?: number | null
           student_id: string
         }
         Update: {
+          class_record_id?: number | null
           created_at?: string
           created_by?: string
           id?: never
@@ -285,10 +381,16 @@ export type Database = {
           movement_type?: Database["public"]["Enums"]["hours_movement_type"]
           notes?: string | null
           package_id?: number | null
-          session_attendance_id?: number | null
           student_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "hours_movements_class_record_id_fkey"
+            columns: ["class_record_id"]
+            isOneToOne: false
+            referencedRelation: "class_records"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hours_movements_created_by_fkey"
             columns: ["created_by"]
@@ -301,13 +403,6 @@ export type Database = {
             columns: ["package_id"]
             isOneToOne: false
             referencedRelation: "hours_packages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hours_movements_session_attendance_id_fkey"
-            columns: ["session_attendance_id"]
-            isOneToOne: false
-            referencedRelation: "session_attendance"
             referencedColumns: ["id"]
           },
           {
@@ -369,6 +464,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      institutional_documents: {
+        Row: {
+          created_at: string
+          id: number
+          is_published: boolean
+          sort_order: number
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          is_published?: boolean
+          sort_order?: number
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          is_published?: boolean
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
       }
       lessons: {
         Row: {
@@ -523,6 +648,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          archived_at: string | null
           created_at: string
           dni: string
           first_name: string
@@ -537,6 +663,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           dni: string
           first_name: string
@@ -551,6 +678,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           dni?: string
           first_name?: string
@@ -675,194 +803,6 @@ export type Database = {
           },
         ]
       }
-      session_attendance: {
-        Row: {
-          decided_at: string | null
-          decided_by: string | null
-          id: number
-          minutes_charged: number | null
-          session_id: number
-          status: Database["public"]["Enums"]["attendance_status"]
-          student_id: string
-        }
-        Insert: {
-          decided_at?: string | null
-          decided_by?: string | null
-          id?: never
-          minutes_charged?: number | null
-          session_id: number
-          status?: Database["public"]["Enums"]["attendance_status"]
-          student_id: string
-        }
-        Update: {
-          decided_at?: string | null
-          decided_by?: string | null
-          id?: never
-          minutes_charged?: number | null
-          session_id?: number
-          status?: Database["public"]["Enums"]["attendance_status"]
-          student_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "session_attendance_decided_by_fkey"
-            columns: ["decided_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "session_attendance_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "session_attendance_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      session_teacher_changes: {
-        Row: {
-          change_type: Database["public"]["Enums"]["session_teacher_change_type"]
-          changed_at: string
-          changed_by: string
-          id: number
-          new_teacher_id: string
-          previous_teacher_id: string | null
-          reason: string | null
-          session_id: number
-        }
-        Insert: {
-          change_type: Database["public"]["Enums"]["session_teacher_change_type"]
-          changed_at?: string
-          changed_by: string
-          id?: never
-          new_teacher_id: string
-          previous_teacher_id?: string | null
-          reason?: string | null
-          session_id: number
-        }
-        Update: {
-          change_type?: Database["public"]["Enums"]["session_teacher_change_type"]
-          changed_at?: string
-          changed_by?: string
-          id?: never
-          new_teacher_id?: string
-          previous_teacher_id?: string | null
-          reason?: string | null
-          session_id?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "session_teacher_changes_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "session_teacher_changes_new_teacher_id_fkey"
-            columns: ["new_teacher_id"]
-            isOneToOne: false
-            referencedRelation: "teacher_profiles"
-            referencedColumns: ["profile_id"]
-          },
-          {
-            foreignKeyName: "session_teacher_changes_previous_teacher_id_fkey"
-            columns: ["previous_teacher_id"]
-            isOneToOne: false
-            referencedRelation: "teacher_profiles"
-            referencedColumns: ["profile_id"]
-          },
-          {
-            foreignKeyName: "session_teacher_changes_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "sessions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sessions: {
-        Row: {
-          actual_end: string | null
-          actual_start: string | null
-          actual_teacher_id: string | null
-          classroom_id: number
-          created_at: string
-          id: number
-          notes: string | null
-          rescheduled_from_session_id: number | null
-          scheduled_end: string
-          scheduled_start: string
-          scheduled_teacher_id: string
-          status: Database["public"]["Enums"]["session_status"]
-        }
-        Insert: {
-          actual_end?: string | null
-          actual_start?: string | null
-          actual_teacher_id?: string | null
-          classroom_id: number
-          created_at?: string
-          id?: never
-          notes?: string | null
-          rescheduled_from_session_id?: number | null
-          scheduled_end: string
-          scheduled_start: string
-          scheduled_teacher_id: string
-          status?: Database["public"]["Enums"]["session_status"]
-        }
-        Update: {
-          actual_end?: string | null
-          actual_start?: string | null
-          actual_teacher_id?: string | null
-          classroom_id?: number
-          created_at?: string
-          id?: never
-          notes?: string | null
-          rescheduled_from_session_id?: number | null
-          scheduled_end?: string
-          scheduled_start?: string
-          scheduled_teacher_id?: string
-          status?: Database["public"]["Enums"]["session_status"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sessions_actual_teacher_id_fkey"
-            columns: ["actual_teacher_id"]
-            isOneToOne: false
-            referencedRelation: "teacher_profiles"
-            referencedColumns: ["profile_id"]
-          },
-          {
-            foreignKeyName: "sessions_classroom_id_fkey"
-            columns: ["classroom_id"]
-            isOneToOne: false
-            referencedRelation: "classrooms"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sessions_rescheduled_from_session_id_fkey"
-            columns: ["rescheduled_from_session_id"]
-            isOneToOne: false
-            referencedRelation: "sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sessions_scheduled_teacher_id_fkey"
-            columns: ["scheduled_teacher_id"]
-            isOneToOne: false
-            referencedRelation: "teacher_profiles"
-            referencedColumns: ["profile_id"]
-          },
-        ]
-      }
       skills: {
         Row: {
           created_at: string
@@ -963,98 +903,47 @@ export type Database = {
           },
         ]
       }
-      teacher_hours_log: {
-        Row: {
-          amount: number
-          billable_minutes: number
-          created_at: string
-          hourly_rate_snapshot: number
-          id: number
-          session_id: number
-          teacher_id: string
-          teacher_payment_period_id: number | null
-        }
-        Insert: {
-          amount: number
-          billable_minutes: number
-          created_at?: string
-          hourly_rate_snapshot: number
-          id?: never
-          session_id: number
-          teacher_id: string
-          teacher_payment_period_id?: number | null
-        }
-        Update: {
-          amount?: number
-          billable_minutes?: number
-          created_at?: string
-          hourly_rate_snapshot?: number
-          id?: never
-          session_id?: number
-          teacher_id?: string
-          teacher_payment_period_id?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "teacher_hours_log_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "teacher_hours_log_teacher_id_fkey"
-            columns: ["teacher_id"]
-            isOneToOne: false
-            referencedRelation: "teacher_profiles"
-            referencedColumns: ["profile_id"]
-          },
-          {
-            foreignKeyName: "teacher_hours_log_teacher_payment_period_id_fkey"
-            columns: ["teacher_payment_period_id"]
-            isOneToOne: false
-            referencedRelation: "teacher_payment_periods"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      teacher_payment_periods: {
+      teacher_payments: {
         Row: {
           created_at: string
+          created_by: string
           id: number
-          paid_at: string | null
-          period_end: string
-          period_start: string
-          status: Database["public"]["Enums"]["teacher_payment_period_status"]
+          paid_at: string
+          reference: string | null
           teacher_id: string
           total_amount: number
           total_minutes: number
         }
         Insert: {
           created_at?: string
+          created_by: string
           id?: never
-          paid_at?: string | null
-          period_end: string
-          period_start: string
-          status?: Database["public"]["Enums"]["teacher_payment_period_status"]
+          paid_at?: string
+          reference?: string | null
           teacher_id: string
-          total_amount?: number
-          total_minutes?: number
+          total_amount: number
+          total_minutes: number
         }
         Update: {
           created_at?: string
+          created_by?: string
           id?: never
-          paid_at?: string | null
-          period_end?: string
-          period_start?: string
-          status?: Database["public"]["Enums"]["teacher_payment_period_status"]
+          paid_at?: string
+          reference?: string | null
           teacher_id?: string
           total_amount?: number
           total_minutes?: number
         }
         Relationships: [
           {
-            foreignKeyName: "teacher_payment_periods_teacher_id_fkey"
+            foreignKeyName: "teacher_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_payments_teacher_id_fkey"
             columns: ["teacher_id"]
             isOneToOne: false
             referencedRelation: "teacher_profiles"
@@ -1097,45 +986,6 @@ export type Database = {
           },
         ]
       }
-      teacher_receipts: {
-        Row: {
-          file_path: string
-          id: number
-          teacher_id: string
-          teacher_payment_period_id: number
-          uploaded_at: string
-        }
-        Insert: {
-          file_path: string
-          id?: never
-          teacher_id: string
-          teacher_payment_period_id: number
-          uploaded_at?: string
-        }
-        Update: {
-          file_path?: string
-          id?: never
-          teacher_id?: string
-          teacher_payment_period_id?: number
-          uploaded_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "teacher_receipts_teacher_id_fkey"
-            columns: ["teacher_id"]
-            isOneToOne: false
-            referencedRelation: "teacher_profiles"
-            referencedColumns: ["profile_id"]
-          },
-          {
-            foreignKeyName: "teacher_receipts_teacher_payment_period_id_fkey"
-            columns: ["teacher_payment_period_id"]
-            isOneToOne: true
-            referencedRelation: "teacher_payment_periods"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       teacher_skills: {
         Row: {
           created_at: string
@@ -1174,6 +1024,50 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_archive_user: {
+        Args: { p_reason?: string; p_target_id: string }
+        Returns: {
+          archived_at: string | null
+          created_at: string
+          dni: string
+          first_name: string
+          id: string
+          last_name: string
+          level: Database["public"]["Enums"]["academic_level"]
+          must_change_password: boolean
+          phone: string
+          program_id: number | null
+          role: Database["public"]["Enums"]["user_role"]
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_cancel_hours_package: {
+        Args: { p_package_id: number; p_reason?: string }
+        Returns: {
+          expires_at: string | null
+          id: number
+          package_label: string
+          payment_id: number
+          price_paid: number
+          purchased_at: string
+          status: Database["public"]["Enums"]["package_status"]
+          student_id: string
+          total_minutes: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "hours_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_provision_student_profile: {
         Args: {
           p_dni: string
@@ -1185,6 +1079,7 @@ export type Database = {
           p_target_id: string
         }
         Returns: {
+          archived_at: string | null
           created_at: string
           dni: string
           first_name: string
@@ -1201,6 +1096,26 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_refund_hours_package: {
+        Args: { p_package_id: number; p_reason?: string }
+        Returns: {
+          expires_at: string | null
+          id: number
+          package_label: string
+          payment_id: number
+          price_paid: number
+          purchased_at: string
+          status: Database["public"]["Enums"]["package_status"]
+          student_id: string
+          total_minutes: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "hours_packages"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1208,6 +1123,7 @@ export type Database = {
       admin_reset_student_password_flag: {
         Args: { p_target_id: string }
         Returns: {
+          archived_at: string | null
           created_at: string
           dni: string
           first_name: string
@@ -1228,99 +1144,40 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      approve_teacher_payment_period: {
-        Args: { p_teacher_payment_period_id: number }
+      admin_restore_user: {
+        Args: { p_reason?: string; p_target_id: string }
         Returns: {
+          archived_at: string | null
           created_at: string
-          id: number
-          paid_at: string | null
-          period_end: string
-          period_start: string
-          status: Database["public"]["Enums"]["teacher_payment_period_status"]
-          teacher_id: string
-          total_amount: number
-          total_minutes: number
+          dni: string
+          first_name: string
+          id: string
+          last_name: string
+          level: Database["public"]["Enums"]["academic_level"]
+          must_change_password: boolean
+          phone: string
+          program_id: number | null
+          role: Database["public"]["Enums"]["user_role"]
+          status: string
+          updated_at: string
         }
         SetofOptions: {
           from: "*"
-          to: "teacher_payment_periods"
+          to: "profiles"
           isOneToOne: true
           isSetofReturn: false
         }
       }
-      assign_classroom_primary_teacher: {
-        Args: { p_classroom_id: number; p_teacher_id: string }
-        Returns: {
-          assigned_at: string
-          classroom_id: number
-          id: number
-          status: Database["public"]["Enums"]["membership_status"]
-          teacher_id: string
-          teacher_role: Database["public"]["Enums"]["classroom_teacher_role"]
-        }
-        SetofOptions: {
-          from: "*"
-          to: "classroom_teachers"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      cancel_session: {
-        Args: { p_session_id: number }
-        Returns: {
-          actual_end: string | null
-          actual_start: string | null
-          actual_teacher_id: string | null
-          classroom_id: number
-          created_at: string
-          id: number
-          notes: string | null
-          rescheduled_from_session_id: number | null
-          scheduled_end: string
-          scheduled_start: string
-          scheduled_teacher_id: string
-          status: Database["public"]["Enums"]["session_status"]
-        }
-        SetofOptions: {
-          from: "*"
-          to: "sessions"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      change_session_teacher: {
-        Args: {
-          p_change_type: Database["public"]["Enums"]["session_teacher_change_type"]
-          p_new_teacher_id: string
-          p_reason?: string
-          p_session_id: number
-        }
-        Returns: {
-          actual_end: string | null
-          actual_start: string | null
-          actual_teacher_id: string | null
-          classroom_id: number
-          created_at: string
-          id: number
-          notes: string | null
-          rescheduled_from_session_id: number | null
-          scheduled_end: string
-          scheduled_start: string
-          scheduled_teacher_id: string
-          status: Database["public"]["Enums"]["session_status"]
-        }
-        SetofOptions: {
-          from: "*"
-          to: "sessions"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      classroom_primary_teacher_name: {
-        Args: { p_classroom_id: number }
+      admin_teacher_payment_summary: {
+        Args: never
         Returns: {
           first_name: string
+          last_class_at: string
           last_name: string
+          pending_amount: number
+          pending_class_count: number
+          pending_minutes: number
+          teacher_id: string
         }[]
       }
       complete_registration: {
@@ -1332,6 +1189,7 @@ export type Database = {
           p_program_id?: number
         }
         Returns: {
+          archived_at: string | null
           created_at: string
           dni: string
           first_name: string
@@ -1352,11 +1210,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      complete_session: {
-        Args: { p_session_id: number }
+      correct_class: {
+        Args: {
+          p_class_record_id: number
+          p_minutes: number
+          p_notes: string
+          p_status: Database["public"]["Enums"]["class_record_status"]
+        }
         Returns: {
-          hours_log_id: number
-          session: Database["public"]["Tables"]["sessions"]["Row"]
+          amount: number
+          classroom_id: number
+          hourly_rate_snapshot: number
+          id: number
+          minutes: number
+          notes: string
+          occurred_at: string
+          status: Database["public"]["Enums"]["class_record_status"]
+          student_balance: number
+          student_id: string
+          teacher_id: string
+          teacher_payment_id: number
         }[]
       }
       create_hour_package: {
@@ -1376,54 +1249,29 @@ export type Database = {
           payment_id: number
         }[]
       }
-      create_my_teacher_availability: {
-        Args: {
-          p_day_of_week: number
-          p_end_time: string
-          p_start_time: string
-        }
+      get_classroom_people: {
+        Args: { p_classroom_id: number }
         Returns: {
-          day_of_week: number
-          end_time: string
-          id: number
-          start_time: string
-          teacher_id: string
-          timezone: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "teacher_availability"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+          student_first_name: string
+          student_id: string
+          student_last_name: string
+          teachers: Json
+        }[]
       }
-      create_teacher_payment_period: {
-        Args: {
-          p_period_end: string
-          p_period_start: string
-          p_teacher_id: string
-        }
+      get_classroom_student_balance: {
+        Args: { p_classroom_id: number }
+        Returns: number
+      }
+      get_student_balance_alerts: {
+        Args: never
         Returns: {
-          created_at: string
-          id: number
-          paid_at: string | null
-          period_end: string
-          period_start: string
-          status: Database["public"]["Enums"]["teacher_payment_period_status"]
-          teacher_id: string
-          total_amount: number
-          total_minutes: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "teacher_payment_periods"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      delete_my_teacher_availability: {
-        Args: { p_id: number }
-        Returns: undefined
+          balance: number
+          classroom_id: number
+          classroom_name: string
+          first_name: string
+          last_name: string
+          student_id: string
+        }[]
       }
       get_user_emails: {
         Args: { p_user_ids: string[] }
@@ -1431,10 +1279,6 @@ export type Database = {
           email: string
           user_id: string
         }[]
-      }
-      initialize_session_attendance: {
-        Args: { p_session_id: number }
-        Returns: number
       }
       mark_invitation_accepted: {
         Args: never
@@ -1454,6 +1298,7 @@ export type Database = {
       mark_password_changed: {
         Args: never
         Returns: {
+          archived_at: string | null
           created_at: string
           dni: string
           first_name: string
@@ -1474,25 +1319,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      mark_teacher_payment_period_paid: {
-        Args: { p_paid_at?: string; p_teacher_payment_period_id: number }
+      pay_teacher_classes: {
+        Args: {
+          p_class_record_ids: number[]
+          p_reference?: string
+          p_teacher_id: string
+        }
         Returns: {
-          created_at: string
-          id: number
-          paid_at: string | null
-          period_end: string
-          period_start: string
-          status: Database["public"]["Enums"]["teacher_payment_period_status"]
+          class_record_ids: number[]
+          paid_at: string
+          payment_id: number
+          reference: string
           teacher_id: string
           total_amount: number
           total_minutes: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "teacher_payment_periods"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        }[]
       }
       promote_user_to_teacher: {
         Args: { p_initial_hourly_rate: number; p_target_profile_id: string }
@@ -1501,79 +1342,32 @@ export type Database = {
           teacher_profile: Database["public"]["Tables"]["teacher_profiles"]["Row"]
         }[]
       }
-      reschedule_session: {
+      register_class: {
         Args: {
-          p_new_scheduled_end: string
-          p_new_scheduled_start: string
-          p_new_scheduled_teacher_id?: string
-          p_reason?: string
-          p_session_id: number
+          p_classroom_id: number
+          p_idempotency_key: string
+          p_minutes: number
+          p_notes: string
+          p_occurred_at: string
+          p_status: Database["public"]["Enums"]["class_record_status"]
         }
         Returns: {
-          actual_end: string | null
-          actual_start: string | null
-          actual_teacher_id: string | null
+          amount: number
           classroom_id: number
-          created_at: string
+          hourly_rate_snapshot: number
           id: number
-          notes: string | null
-          rescheduled_from_session_id: number | null
-          scheduled_end: string
-          scheduled_start: string
-          scheduled_teacher_id: string
-          status: Database["public"]["Enums"]["session_status"]
-        }
-        SetofOptions: {
-          from: "*"
-          to: "sessions"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      set_student_session_billing: {
-        Args: {
-          p_attendance_status: Database["public"]["Enums"]["attendance_status"]
-          p_minutes_charged: number
-          p_notes?: string
-          p_session_id: number
-          p_student_id: string
-        }
-        Returns: {
-          attendance_id: number
-          minutes_charged: number
-          movement_ids: number[]
+          minutes: number
+          notes: string
+          occurred_at: string
+          status: Database["public"]["Enums"]["class_record_status"]
+          student_balance: number
+          student_id: string
+          teacher_id: string
+          teacher_payment_id: number
         }[]
       }
-      start_session: {
-        Args: { p_actual_teacher_id?: string; p_session_id: number }
-        Returns: {
-          actual_end: string | null
-          actual_start: string | null
-          actual_teacher_id: string | null
-          classroom_id: number
-          created_at: string
-          id: number
-          notes: string | null
-          rescheduled_from_session_id: number | null
-          scheduled_end: string
-          scheduled_start: string
-          scheduled_teacher_id: string
-          status: Database["public"]["Enums"]["session_status"]
-        }
-        SetofOptions: {
-          from: "*"
-          to: "sessions"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      update_my_teacher_availability: {
-        Args: {
-          p_day_of_week: number
-          p_end_time: string
-          p_id: number
-          p_start_time: string
-        }
+      set_my_teacher_availability: {
+        Args: { p_blocks: Json }
         Returns: {
           day_of_week: number
           end_time: string
@@ -1581,26 +1375,32 @@ export type Database = {
           start_time: string
           teacher_id: string
           timezone: string
-        }
+        }[]
         SetofOptions: {
           from: "*"
           to: "teacher_availability"
-          isOneToOne: true
-          isSetofReturn: false
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
-      upload_teacher_receipt: {
-        Args: { p_file_path: string; p_teacher_payment_period_id: number }
+      set_my_teacher_skills: {
+        Args: { p_skill_ids: number[] }
         Returns: {
-          period: Database["public"]["Tables"]["teacher_payment_periods"]["Row"]
-          receipt_id: number
+          created_at: string
+          id: number
+          name: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "skills"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
     }
     Enums: {
       academic_level: "A1" | "A2" | "B1" | "B2" | "C1" | "C2"
-      attendance_status: "present" | "absent" | "cancelled" | "rescheduled"
-      classroom_teacher_role: "PRIMARY" | "SUBSTITUTE"
+      class_record_status: "present" | "absent" | "rescheduled"
       expense_category:
         | "marketing"
         | "software"
@@ -1618,7 +1418,12 @@ export type Database = {
         | "adjustment"
         | "expiration"
       membership_status: "active" | "inactive"
-      package_status: "active" | "exhausted" | "expired"
+      package_status:
+        | "active"
+        | "exhausted"
+        | "expired"
+        | "cancelled"
+        | "refunded"
       payment_status: "pending" | "completed" | "failed" | "refunded"
       placement_attempt_status:
         | "not_started"
@@ -1635,16 +1440,6 @@ export type Database = {
         | "url"
         | "embed"
         | "vimeo"
-      session_status: "scheduled" | "completed" | "cancelled" | "rescheduled"
-      session_teacher_change_type:
-        | "SCHEDULED_TEACHER_CHANGED"
-        | "ACTUAL_TEACHER_CHANGED"
-      teacher_payment_period_status:
-        | "pending"
-        | "pending_receipt"
-        | "receipt_uploaded"
-        | "approved"
-        | "paid"
       user_role: "admin" | "teacher" | "student"
     }
     CompositeTypes: {
@@ -1774,8 +1569,7 @@ export const Constants = {
   public: {
     Enums: {
       academic_level: ["A1", "A2", "B1", "B2", "C1", "C2"],
-      attendance_status: ["present", "absent", "cancelled", "rescheduled"],
-      classroom_teacher_role: ["PRIMARY", "SUBSTITUTE"],
+      class_record_status: ["present", "absent", "rescheduled"],
       expense_category: [
         "marketing",
         "software",
@@ -1795,7 +1589,13 @@ export const Constants = {
         "expiration",
       ],
       membership_status: ["active", "inactive"],
-      package_status: ["active", "exhausted", "expired"],
+      package_status: [
+        "active",
+        "exhausted",
+        "expired",
+        "cancelled",
+        "refunded",
+      ],
       payment_status: ["pending", "completed", "failed", "refunded"],
       placement_attempt_status: [
         "not_started",
@@ -1813,18 +1613,6 @@ export const Constants = {
         "url",
         "embed",
         "vimeo",
-      ],
-      session_status: ["scheduled", "completed", "cancelled", "rescheduled"],
-      session_teacher_change_type: [
-        "SCHEDULED_TEACHER_CHANGED",
-        "ACTUAL_TEACHER_CHANGED",
-      ],
-      teacher_payment_period_status: [
-        "pending",
-        "pending_receipt",
-        "receipt_uploaded",
-        "approved",
-        "paid",
       ],
       user_role: ["admin", "teacher", "student"],
     },

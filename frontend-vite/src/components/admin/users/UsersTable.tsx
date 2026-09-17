@@ -17,6 +17,19 @@ function AccessTag({ accessStatus }: { accessStatus: AccessStatus | null }) {
   );
 }
 
+function StatusCell({ row }: { row: UserListItem }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <Tag tone={row.status === "active" ? "success" : "danger"}>{row.status === "active" ? "Activo" : "Inactivo"}</Tag>
+      {row.archivedAt !== null && (
+        <Tag tone="neutral" size="sm">
+          Archivado
+        </Tag>
+      )}
+    </span>
+  );
+}
+
 export interface UsersTableProps {
   items: UserListItem[];
   mode: "usuarios" | "estudiantes";
@@ -54,7 +67,7 @@ export function UsersTable({ items, mode }: UsersTableProps) {
     {
       key: "status",
       header: "Estado",
-      render: (row) => <Tag tone={row.status === "active" ? "success" : "danger"}>{row.status === "active" ? "Activo" : "Inactivo"}</Tag>,
+      render: (row) => <StatusCell row={row} />,
     },
     {
       key: "createdAt",
@@ -74,7 +87,7 @@ export function UsersTable({ items, mode }: UsersTableProps) {
     {
       key: "status",
       header: "Estado",
-      render: (row) => <Tag tone={row.status === "active" ? "success" : "danger"}>{row.status === "active" ? "Activo" : "Inactivo"}</Tag>,
+      render: (row) => <StatusCell row={row} />,
     },
     {
       key: "accessStatus",

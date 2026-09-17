@@ -26,7 +26,8 @@ export interface AdminHourPackageListItem {
 }
 
 /** Fila cruda del ledger (hours_movements) -- ningún cálculo, cada fila es un hecho ya registrado
- * por create_hour_package o set_student_session_billing (0009). */
+ * por create_hour_package (compra) o register_class/correct_class (consumo, package_id siempre
+ * null -- ver server/hours/queries.ts). set_student_session_billing/sessions ya no existen. */
 export interface AdminHoursMovementItem {
   [key: string]: unknown;
   id: number;

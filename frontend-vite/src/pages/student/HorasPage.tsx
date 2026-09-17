@@ -1,4 +1,4 @@
-import { useHoursPackages, useAttendanceHistory } from "@/features/hours/hooks";
+import { useHoursPackages, useAttendanceHistory, useStudentBalance } from "@/features/hours/hooks";
 import { summarizeHoursPackages } from "@/server/hours/queries";
 import { Card } from "@/components/ui/surfaces/Card";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
@@ -11,9 +11,11 @@ import { AttendanceHistoryTable } from "@/components/student/hours/AttendanceHis
 export function StudentHorasPage() {
   const packagesQuery = useHoursPackages();
   const historyQuery = useAttendanceHistory();
+  const balanceQuery = useStudentBalance();
 
-  const isLoading = packagesQuery.isLoading || historyQuery.isLoading;
-  const isError = packagesQuery.isError || historyQuery.isError;
+  const isLoading = packagesQuery.isLoading || historyQuery.isLoading || balanceQuery.isLoading;
+  const hasData = packagesQuery.data && historyQuery.data && balanceQuery.data !== undefined;
+  const isError = packagesQuery.isError || historyQuery.isError || balanceQuery.isError || !hasData;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
@@ -32,11 +34,11 @@ export function StudentHorasPage() {
         <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-5) 0" }}>
           <Spinner size={24} label="Cargando horas…" />
         </div>
-      ) : isError || !packagesQuery.data || !historyQuery.data ? (
+      ) : isError || !packagesQuery.data || !historyQuery.data || balanceQuery.data === undefined ? (
         <Alert tone="danger">No pudimos cargar tus horas. Recarga la página.</Alert>
       ) : (
         <>
-          <HoursSummaryCard summary={summarizeHoursPackages(packagesQuery.data)} />
+          <HoursSummaryCard summary={summarizeHoursPackages(packagesQuery.data, balanceQuery.data)} />
 
           <Card header={<span style={{ font: "var(--weight-bold) 15px/1 var(--font-display)", color: "var(--text-heading)" }}>Mis paquetes</span>} pad={packagesQuery.data.length === 0}>
             {packagesQuery.data.length === 0 ? (

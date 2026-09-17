@@ -1,90 +1,67 @@
 import type { Database } from "@/types/database.types";
 import type { TagTone } from "@/components/ui/core/Tag";
 
-export type PayrollPeriodStatus = Database["public"]["Enums"]["teacher_payment_period_status"];
+export type ClassRecordStatus = Database["public"]["Enums"]["class_record_status"];
 
-export const PAYROLL_STATUS_LABEL: Record<PayrollPeriodStatus, string> = {
+/** Estado financiero derivado (nunca almacenado): REPROGRAMADA nunca genera deuda; PRESENT/ABSENT
+ * es PENDIENTE hasta que teacher_payment_id se asigna, luego PAGADO -- para siempre, nunca vuelve
+ * a cambiar (class_records_lock_paid, Slice A). */
+export type ClassRecordFinancialStatus = "pending" | "paid" | "not_applicable";
+
+export const FINANCIAL_STATUS_LABEL: Record<ClassRecordFinancialStatus, string> = {
   pending: "Pendiente",
-  pending_receipt: "Pendiente de recibo",
-  receipt_uploaded: "Recibo subido",
-  approved: "Aprobado",
   paid: "Pagado",
+  not_applicable: "No aplica",
 };
 
-/** Única fuente de verdad para el color del estado -- reutilizada por PayrollPeriodsTable y por
- * el detalle, para que ambas pantallas nunca puedan divergir en qué tono le corresponde a cada
- * status. */
-export const PAYROLL_STATUS_TONE: Record<PayrollPeriodStatus, TagTone> = {
-  pending: "neutral",
-  pending_receipt: "neutral",
-  receipt_uploaded: "warning",
-  approved: "brand",
+export const FINANCIAL_STATUS_TONE: Record<ClassRecordFinancialStatus, TagTone> = {
+  pending: "warning",
   paid: "success",
+  not_applicable: "neutral",
 };
 
-export interface PayrollPeriodListItem {
-  // Índice requerido por DataTable<T extends Record<string, unknown>> (Design System) -- mismo
-  // criterio que el resto de *ListItem del proyecto.
-  [key: string]: unknown;
-  id: number;
-  teacherId: string;
-  teacherName: string;
-  /** date puro "YYYY-MM-DD" (columna `date`, sin hora/zona) -- nunca pasar por Date()/timeZone,
-   * formatear con split simple. */
-  periodStart: string;
-  periodEnd: string;
-  totalMinutes: number;
-  totalAmount: number;
-  status: PayrollPeriodStatus;
-  hasReceipt: boolean;
+export function classRecordFinancialStatus(status: ClassRecordStatus, teacherPaymentId: number | null): ClassRecordFinancialStatus {
+  if (status === "rescheduled") return "not_applicable";
+  return teacherPaymentId ? "paid" : "pending";
 }
 
-export interface PayrollHourItem {
-  id: number;
-  sessionId: number;
-  classroomName: string;
-  /** scheduled_start real (timestamptz) de la sesión -- este sí es un instante real, a
-   * diferencia de period_start/period_end. */
-  sessionDate: string;
-  billableMinutes: number;
-  hourlyRateSnapshot: number;
-  amount: number;
-}
-
-export interface PayrollReceiptSummary {
-  id: number;
-  filePath: string;
-  uploadedAt: string;
-}
-
-export interface PayrollPeriodDetail {
-  id: number;
-  teacherId: string;
-  teacherName: string;
-  periodStart: string;
-  periodEnd: string;
-  totalMinutes: number;
-  totalAmount: number;
-  status: PayrollPeriodStatus;
-  paidAt: string | null;
-  hours: PayrollHourItem[];
-  receipt: PayrollReceiptSummary | null;
-}
-
-export interface TeacherDebtSummaryItem {
+/** Fila del listado principal Admin -> Pagos a profesores (admin_teacher_payment_summary). Los
+ * totales pendientes se calculan exclusivamente desde class_records PRESENT/ABSENT con amount no
+ * nulo y teacher_payment_id nulo -- nunca desde otra tabla. */
+export interface TeacherPaymentSummaryItem {
   [key: string]: unknown;
   teacherId: string;
   teacherName: string;
-  /** SUM(teacher_hours_log.amount) del docente -- todo lo generado históricamente, sin importar
-   * si ya se agrupó en un periodo o se pagó. */
-  generatedAmount: number;
-  /** SUM(teacher_hours_log.amount) cuyo teacher_payment_periods.status = 'paid' -- únicamente
-   * 'paid' cuenta como pagado (pending/pending_receipt/receipt_uploaded/approved siguen siendo
-   * deuda). */
-  paidAmount: number;
-  /** generatedAmount - paidAmount, calculado en centavos enteros para que la igualdad sea exacta. */
+  pendingClassCount: number;
+  pendingMinutes: number;
   pendingAmount: number;
-  /** sessions.actual_end (fallback actual_start) de la sesión más reciente que generó costo para
-   * este docente -- null si nunca dictó ninguna. Nunca teacher_hours_log.created_at. */
   lastClassAt: string | null;
+}
+
+/** Fila del estado de cuenta de un profesor (Admin -> Pagos a profesores -> detalle).
+ * Índice requerido por DataTable<T extends Record<string, unknown>> (Design System). */
+export interface TeacherPaymentStatementRow {
+  [key: string]: unknown;
+  id: number;
+  occurredAt: string;
+  status: ClassRecordStatus;
+  minutes: number;
+  notes: string | null;
+  hourlyRateSnapshot: number | null;
+  amount: number | null;
+  teacherPaymentId: number | null;
+  paidAt: string | null;
+  classroomName: string;
+  studentName: string;
+  financialStatus: ClassRecordFinancialStatus;
+}
+
+export interface PayTeacherClassesResult {
+  paymentId: number;
+  teacherId: string;
+  paidAt: string;
+  totalMinutes: number;
+  totalAmount: number;
+  reference: string | null;
+  classRecordIds: number[];
 }

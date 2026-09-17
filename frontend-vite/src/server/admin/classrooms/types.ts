@@ -1,13 +1,12 @@
 import type { Database } from "@/types/database.types";
 
 export type AcademicLevel = Database["public"]["Enums"]["academic_level"];
-export type ClassroomTeacherRole = Database["public"]["Enums"]["classroom_teacher_role"];
 // classrooms.status es `text` con CHECK (0005), no un enum real de Postgres.
 export type ClassroomStatus = "active" | "archived";
 
 export interface ClassroomListItem {
-  // Índice requerido por DataTable<T extends Record<string, unknown>> (componente genérico del
-  // Design System); no relaja el tipado de los accesos nombrados abajo.
+  // Índice requerido por DataTable<T extends Record<string, unknown>> (Design System) -- mismo
+  // criterio que el resto de *ListItem del proyecto.
   [key: string]: unknown;
   id: number;
   name: string;
@@ -15,8 +14,11 @@ export interface ClassroomListItem {
   programName: string;
   level: AcademicLevel;
   status: ClassroomStatus;
-  primaryTeacherName: string | null;
-  studentCount: number;
+  studentName: string | null;
+  /** SUM(hours_movements.minutes_delta) del estudiante asignado (Slice G) -- null si el salón no
+   * tiene estudiante. Nunca desde hours_packages.remaining_minutes. */
+  studentBalance: number | null;
+  enabledTeacherCount: number;
 }
 
 export interface ClassroomListFilters {
@@ -25,16 +27,14 @@ export interface ClassroomListFilters {
   status?: ClassroomStatus | "all";
 }
 
+/** Sin PRIMARY/SUBSTITUTE (Slice A) -- cualquier fila activa es un profesor habilitado. */
 export interface TeacherMembership {
   teacherId: string;
   firstName: string;
   lastName: string;
-  role: ClassroomTeacherRole;
 }
 
-export interface StudentMembership {
-  // Índice requerido por DataTable<T extends Record<string, unknown>>; ver ClassroomListItem.
-  [key: string]: unknown;
+export interface ClassroomStudent {
   studentId: string;
   firstName: string;
   lastName: string;
@@ -50,8 +50,9 @@ export interface ClassroomDetail {
   description: string | null;
   scheduleNotes: string | null;
   status: ClassroomStatus;
+  /** classrooms.student_id -- null si el salón todavía no tiene alumno asignado. */
+  student: ClassroomStudent | null;
   teachers: TeacherMembership[];
-  students: StudentMembership[];
 }
 
 export interface AssignableTeacher {

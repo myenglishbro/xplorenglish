@@ -25,14 +25,14 @@ export function TeacherCostTable({ items, generatedInPeriod, pendingTotal }: Tea
   const columns: DataTableColumn<TeacherCostDetailItem>[] = [
     { key: "teacherName", header: "Profesor" },
     { key: "minutes", header: "Tiempo trabajado", render: (row) => formatMinutesAsHours(row.minutes) },
-    { key: "amount", header: "Costo generado", align: "right", render: (row) => formatCurrencyAmount(row.amount, "PEN") },
+    { key: "amount", header: "Costo docente generado", align: "right", render: (row) => formatCurrencyAmount(row.amount, "PEN") },
   ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--space-4)" }}>
-        <StatCard label="Costo docente del periodo" value={formatCurrencyAmount(generatedInPeriod, "PEN")} icon="chalkboard-teacher" tone="accent" />
-        <StatCard label="Pendiente total actual (todos los meses)" value={formatCurrencyAmount(pendingTotal, "PEN")} icon="clock-countdown" tone="brand" />
+        <StatCard label="Costo docente generado del periodo" value={formatCurrencyAmount(generatedInPeriod, "PEN")} icon="chalkboard-teacher" tone="accent" />
+        <StatCard label="Deuda docente actual (todos los meses)" value={formatCurrencyAmount(pendingTotal, "PEN")} icon="clock-countdown" tone="brand" />
       </div>
 
       {items.length === 0 ? (

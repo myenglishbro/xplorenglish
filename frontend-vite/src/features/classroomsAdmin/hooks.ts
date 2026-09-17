@@ -2,9 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
 import { listClassrooms, getClassroomDetail, listAssignableTeachers, listAssignableStudents } from "@/server/admin/classrooms/queries";
-import { getClassroomTeacherCompatibility } from "@/server/scheduling/compatibility";
 import { classroomSchema, type ClassroomInput } from "@/server/admin/classrooms/validation";
-import type { AssignableTeacher, ClassroomListFilters, ClassroomTeacherRole } from "@/server/admin/classrooms/types";
+import type { ClassroomListFilters } from "@/server/admin/classrooms/types";
 
 export type ClassroomFieldErrors = Partial<Record<keyof ClassroomInput, string>>;
 
@@ -37,26 +36,13 @@ export function useAssignableStudents() {
   });
 }
 
-/**
- * `teachers` es la MISMA lista que ya carga useAssignableTeachers() en la página de detalle de
- * salón -- se pasa como argumento en vez de que este hook (vía getClassroomTeacherCompatibility)
- * vuelva a pedir teacher_profiles por su cuenta (performance slice 1: eliminaba un round-trip
- * duplicado en /admin/salones/:id). Por eso queda deshabilitado hasta que `teachers` esté
- * disponible -- nunca calcula compatibilidad con una lista vacía por carecer todavía del dato real.
- */
-export function useClassroomCompatibility(classroomId: number, teachers: AssignableTeacher[] | undefined) {
-  return useQuery({
-    queryKey: queryKeys.adminClassroomCompatibility(classroomId),
-    queryFn: () => getClassroomTeacherCompatibility(supabase, classroomId, teachers!),
-    enabled: Number.isFinite(classroomId) && teachers !== undefined,
-  });
-}
-
 function invalidateClassroomQueries(queryClient: ReturnType<typeof useQueryClient>, classroomId?: number) {
   queryClient.invalidateQueries({ queryKey: ["admin-classrooms"] });
+  // El Dashboard (Agenda semanal + alerta "salones sin profesor") también depende de
+  // classrooms/classroom_teachers -- sin esto quedaría desactualizado hasta recargar.
+  queryClient.invalidateQueries({ queryKey: queryKeys.adminDashboard() });
   if (classroomId !== undefined) {
     queryClient.invalidateQueries({ queryKey: queryKeys.adminClassroomDetail(classroomId) });
-    queryClient.invalidateQueries({ queryKey: queryKeys.adminClassroomCompatibility(classroomId) });
   }
 }
 
@@ -116,107 +102,48 @@ export function useSetClassroomStatus(classroomId: number) {
   });
 }
 
-const ASSIGN_PRIMARY_ERROR_MESSAGES: Record<string, string> = {
-  NOT_AUTHORIZED: "No tienes permisos para realizar esta acción.",
-  CLASSROOM_NOT_FOUND: "El salón no existe.",
-  TEACHER_NOT_FOUND: "Ese usuario no es un docente.",
-  TEACHER_INACTIVE: "Ese docente está inactivo; actívalo antes de asignarlo como titular.",
-  NO_AVAILABILITY: "Ese docente no tiene disponibilidad registrada.",
-  INSUFFICIENT_AVAILABILITY: "La disponibilidad del docente no cubre el horario del salón.",
-  SCHEDULE_CONFLICT: "Ese docente ya tiene un compromiso que se solapa con este horario.",
-};
-
 /**
- * assign_classroom_primary_teacher (0015) -- RPC directo, desactiva atómicamente cualquier
- * PRIMARY activo distinto y hace upsert del nuevo. La compatibilidad se recalcula aquí mismo
- * justo antes de llamar al RPC (nunca se confía en un estado ya calculado en el cliente, que
- * pudo quedar desactualizado): mismo criterio que assignPrimaryTeacherAction (Next). A propósito
- * pide `listAssignableTeachers` FRESCO en vez de reutilizar la lista ya cargada por la página
- * (useAssignableTeachers) -- esta es la revalidación de seguridad justo antes del RPC, no la carga
- * inicial de UI que sí se deduplicó (performance slice 1); debe reflejar el estado más actual
- * posible de qué docentes siguen activos. El RPC en Postgres sigue siendo la autoridad real
- * (0019/0020): esto es defensa en profundidad en el cliente, nunca el único control.
+ * classrooms.student_id (Slice A/F) -- un UPDATE directo, protegido por el trigger
+ * classrooms_check_student_assignment (solo role='student' y status='active') y por RLS
+ * classrooms_admin_write. Cambiar el alumno NUNCA modifica class_records históricos -- esos
+ * conservan su propio student_id snapshot, independiente de este campo.
  */
-export function useAssignPrimaryTeacher(classroomId: number) {
+export function useSetClassroomStudent(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (teacherId: string) => {
-      const activeTeachers = await listAssignableTeachers(supabase);
-      const compatibility = await getClassroomTeacherCompatibility(supabase, classroomId, activeTeachers);
-      if (!compatibility.hasActiveSchedules) {
-        throw new Error("Define primero el horario del salón antes de asignar un docente titular.");
-      }
-      const entry = compatibility.teachers.find((t) => t.teacherId === teacherId);
-      if (!entry || entry.status !== "compatible") {
-        throw new Error("Ese docente ya no es compatible con el horario del salón. Actualiza la selección e inténtalo de nuevo.");
-      }
-      const { error } = await supabase.rpc("assign_classroom_primary_teacher", { p_classroom_id: classroomId, p_teacher_id: teacherId });
+    mutationFn: async (studentId: string | null) => {
+      const { error } = await supabase.from("classrooms").update({ student_id: studentId }).eq("id", classroomId);
       if (error) {
-        const code = error.message.split(":")[0] ?? "";
-        throw new Error(ASSIGN_PRIMARY_ERROR_MESSAGES[code] ?? "No pudimos asignar el docente titular. Inténtalo de nuevo.");
+        if (error.message.startsWith("INVALID_CLASSROOM_STUDENT")) throw new Error("Solo se pueden asignar perfiles con rol estudiante y activos.");
+        throw new Error("No pudimos actualizar el estudiante del salón. Inténtalo de nuevo en unos minutos.");
       }
     },
     onSuccess: () => invalidateClassroomQueries(queryClient, classroomId),
   });
 }
 
-/** Sin invariante multi-fila que proteger -- upsert directo, browser-direct. */
-export function useAssignSubstituteTeacher(classroomId: number) {
+/** Habilitar un profesor: upsert directo, sin PRIMARY/SUBSTITUTE (Slice A). */
+export function useAddClassroomTeacher(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (teacherId: string) => {
-      const { data: teacher, error: teacherError } = await supabase.from("teacher_profiles").select("status").eq("profile_id", teacherId).maybeSingle();
-      if (teacherError || !teacher) throw new Error("Ese usuario no es un docente.");
-      if (teacher.status !== "active") throw new Error("Ese docente está inactivo; actívalo antes de asignarlo.");
-
       const { error } = await supabase
         .from("classroom_teachers")
-        .upsert({ classroom_id: classroomId, teacher_id: teacherId, teacher_role: "SUBSTITUTE", status: "active" }, { onConflict: "classroom_id,teacher_id" });
-      if (error) throw new Error("No pudimos asignar el docente suplente. Inténtalo de nuevo en unos minutos.");
+        .upsert({ classroom_id: classroomId, teacher_id: teacherId, status: "active" }, { onConflict: "classroom_id,teacher_id" });
+      if (error) throw new Error("No pudimos habilitar al profesor. Inténtalo de nuevo en unos minutos.");
     },
     onSuccess: () => invalidateClassroomQueries(queryClient, classroomId),
   });
 }
 
+/** Quitar/deshabilitar: siempre status='inactive', NUNCA DELETE -- preserva class_records/
+ * teacher_payments históricos del profesor en este salón (Slice F, requisito explícito). */
 export function useRemoveClassroomTeacher(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ teacherId }: { teacherId: string; role: ClassroomTeacherRole }) => {
+    mutationFn: async (teacherId: string) => {
       const { error } = await supabase.from("classroom_teachers").update({ status: "inactive" }).eq("classroom_id", classroomId).eq("teacher_id", teacherId);
-      if (error) throw new Error("No pudimos quitar al docente. Inténtalo de nuevo en unos minutos.");
-    },
-    onSuccess: () => invalidateClassroomQueries(queryClient, classroomId),
-  });
-}
-
-/** Pre-check de rol para un mensaje amigable -- la autoridad final es el trigger
- * classroom_students_check_role (0015). */
-export function useAddClassroomStudent(classroomId: number) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (studentId: string) => {
-      const { data: student, error: studentError } = await supabase.from("profiles").select("role").eq("id", studentId).maybeSingle();
-      if (studentError || !student) throw new Error("Ese perfil no existe.");
-      if (student.role !== "student") throw new Error("Solo se pueden enrolar perfiles con rol estudiante.");
-
-      const { error } = await supabase
-        .from("classroom_students")
-        .upsert({ classroom_id: classroomId, student_id: studentId, status: "active" }, { onConflict: "classroom_id,student_id" });
-      if (error) {
-        if (error.message.startsWith("INVALID_CLASSROOM_STUDENT")) throw new Error("Solo se pueden enrolar perfiles con rol estudiante.");
-        throw new Error("No pudimos agregar al estudiante. Inténtalo de nuevo en unos minutos.");
-      }
-    },
-    onSuccess: () => invalidateClassroomQueries(queryClient, classroomId),
-  });
-}
-
-export function useRemoveClassroomStudent(classroomId: number) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (studentId: string) => {
-      const { error } = await supabase.from("classroom_students").update({ status: "inactive" }).eq("classroom_id", classroomId).eq("student_id", studentId);
-      if (error) throw new Error("No pudimos quitar al estudiante. Inténtalo de nuevo en unos minutos.");
+      if (error) throw new Error("No pudimos quitar al profesor. Inténtalo de nuevo en unos minutos.");
     },
     onSuccess: () => invalidateClassroomQueries(queryClient, classroomId),
   });

@@ -1,27 +1,24 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { usePaymentDetail } from "@/features/paymentsAdmin/hooks";
+import { useRefundHoursPackage } from "@/features/hoursAdmin/hooks";
 import { Icon } from "@/components/ui/core/Icon";
 import { Card } from "@/components/ui/surfaces/Card";
 import { Tag } from "@/components/ui/core/Tag";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { PaymentProofSection } from "@/components/admin/payments/PaymentProofSection";
+import { ReasonConfirmButton } from "@/components/admin/ReasonConfirmButton";
 import { formatCurrencyAmount } from "@/lib/format/currency";
 import { formatMinutesAsHours } from "@/lib/format/minutes";
 import { formatLongDateInLima } from "@/lib/datetime/lima";
+import { PACKAGE_STATUS_LABEL } from "@/server/hours/types";
 
 const PAYMENT_STATUS_LABEL: Record<string, string> = {
   pending: "Pendiente",
   completed: "Completado",
   failed: "Fallido",
   refunded: "Reembolsado",
-};
-
-const PACKAGE_STATUS_LABEL: Record<string, string> = {
-  active: "Activo",
-  exhausted: "Agotado",
-  expired: "Vencido",
 };
 
 const MOVEMENT_TYPE_LABEL: Record<string, string> = {
@@ -46,6 +43,7 @@ export function PagoEstudianteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const paymentId = Number(id);
   const { data: payment, isLoading, isError } = usePaymentDetail(paymentId);
+  const refundPackage = useRefundHoursPackage();
 
   if (!Number.isFinite(paymentId)) {
     return <EmptyState icon="warning" title="Este pago no existe">Vuelve al listado de pagos.</EmptyState>;
@@ -109,6 +107,27 @@ export function PagoEstudianteDetailPage() {
           <DetailRow label="Comprado el" value={formatLongDateInLima(new Date(payment.package.purchasedAt))} />
           <DetailRow label="Vence" value={payment.package.expiresAt ? formatLongDateInLima(new Date(payment.package.expiresAt)) : "—"} />
           <DetailRow label="Estado del paquete" value={PACKAGE_STATUS_LABEL[payment.package.status]} />
+          {payment.package.status !== "cancelled" && payment.package.status !== "refunded" && (
+            <div style={{ marginTop: "var(--space-3)" }}>
+              <ReasonConfirmButton
+                label="Reembolsar"
+                variant="secondary"
+                destructive
+                confirmTitle="Reembolsar paquete"
+                confirmDescription="Retira los minutos de este paquete del saldo del alumno Y marca este pago como reembolsado (deja de contar como ingreso en Reportes). Se rechaza si el alumno ya consumió más de lo disponible en este paquete."
+                confirmLabel="Reembolsar"
+                reasonPlaceholder="Ej. el estudiante canceló y se le devolvió el dinero…"
+                action={async (reason) => {
+                  try {
+                    await refundPackage.mutateAsync({ packageId: payment.package!.id, studentId: payment.studentId, reason });
+                    return {};
+                  } catch (err) {
+                    return { error: err instanceof Error ? err.message : "No pudimos reembolsar el paquete." };
+                  }
+                }}
+              />
+            </div>
+          )}
         </Card>
       ) : (
         <Card header={<span style={{ font: "var(--weight-bold) 15px/1 var(--font-display)", color: "var(--text-heading)" }}>Paquete relacionado</span>}>

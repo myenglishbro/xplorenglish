@@ -38,16 +38,21 @@ export function EstudianteHorasDetailPage() {
     [packagesQuery.data, id]
   );
 
+  // availableMinutes SIEMPRE desde el ledger crudo (movementsQuery, ya cargado para "Historial de
+  // movimientos" -- sin round-trip extra), nunca sumando remainingMinutes por paquete: esa suma es
+  // la misma causa que hacía que el dashboard del propio estudiante mostrara un saldo desactualizado
+  // (los consumos de register_class/correct_class nacen con package_id=NULL), y aquí produciría el
+  // mismo número incorrecto para el admin.
   const summary = React.useMemo(
     () => ({
       acquiredMinutes: studentPackages.reduce((sum, p) => sum + p.totalMinutes, 0),
       consumedMinutes: studentPackages.reduce((sum, p) => sum + p.consumedMinutes, 0),
-      availableMinutes: studentPackages.reduce((sum, p) => sum + p.remainingMinutes, 0),
+      availableMinutes: (movementsQuery.data ?? []).reduce((sum, m) => sum + m.minutesDelta, 0),
     }),
-    [studentPackages]
+    [studentPackages, movementsQuery.data]
   );
 
-  if (userQuery.isLoading || packagesQuery.isLoading) {
+  if (userQuery.isLoading || packagesQuery.isLoading || movementsQuery.isLoading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-6) 0" }}>
         <Spinner size={28} label="Cargando…" />

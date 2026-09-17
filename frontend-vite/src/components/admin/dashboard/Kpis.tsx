@@ -5,23 +5,21 @@ function kpiDisplayValue(kpi: KpiValue): string {
   return kpi.status === "ok" ? String(kpi.value) : "—";
 }
 
-const CURRENCY = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" });
+export interface KpisProps {
+  kpis: DashboardKpis;
+  /** "Sin saldo" -- estudiantes activos con balance <= 0. Se calcula en DashboardPage a partir de
+   * useStudentBalanceAlerts (Slice G, ver classifyStudentBalance), NUNCA una query/definición nueva
+   * de saldo acá. */
+  studentsWithoutBalance: KpiValue;
+}
 
-export function Kpis({ kpis }: { kpis: DashboardKpis }) {
-  const pending = kpis.pendingStudentPayments;
-
+export function Kpis({ kpis, studentsWithoutBalance }: KpisProps) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
       <StatCard label="Estudiantes activos" value={kpiDisplayValue(kpis.activeStudents)} icon="student" tone="accent" />
       <StatCard label="Docentes activos" value={kpiDisplayValue(kpis.activeTeachers)} icon="chalkboard-teacher" tone="accent" />
       <StatCard label="Salones activos" value={kpiDisplayValue(kpis.activeClassrooms)} icon="chalkboard" tone="accent" />
-      <StatCard label="Clases de hoy" value={kpiDisplayValue(kpis.todaySessionsCount)} icon="calendar-blank" tone="brand" />
-      <StatCard
-        label="Pagos estudiantes pendientes"
-        value={pending.status === "ok" ? `${pending.value.count} · ${CURRENCY.format(pending.value.totalAmount)}` : "—"}
-        icon="credit-card"
-        tone="brand"
-      />
+      <StatCard label="Sin saldo" value={kpiDisplayValue(studentsWithoutBalance)} icon="warning" tone="brand" />
     </div>
   );
 }

@@ -1,14 +1,8 @@
 import type { Database } from "@/types/database.types";
 
-export type AlertKind =
-  | "classroom_without_primary"
-  | "session_overdue_unresolved"
-  | "teacher_period_pending_receipt"
-  | "teacher_period_awaiting_payment";
+export type AlertKind = "classroom_without_teacher" | "teacher_classes_pending_payment";
 
 export type ActivityKind = "student_payment_completed" | "teacher_period_paid";
-
-export type ClassesMode = "today" | "upcoming";
 
 /**
  * Resultado de una sección del dashboard, aislado del resto: si esta consulta falla,
@@ -21,30 +15,42 @@ export type SectionResult<T> =
 
 /**
  * Valor individual de KPI, aislado del resto de KPIs: si el conteo de un KPI falla,
- * los otros 4 se muestran igual. "error" nunca se confunde con un 0 real.
+ * los otros se muestran igual. "error" nunca se confunde con un 0 real.
  */
 export type KpiValue<T = number> = { status: "ok"; value: T } | { status: "error" };
 
+/** Ajuste del dashboard (post-Slice H): se retiran "Clases de hoy" (class_schedules es
+ * planificación referencial, no algo "de hoy" realmente ocurrido) y "Pagos estudiantes pendientes"
+ * (no existe venta a crédito en el modelo actual -- register_class/correct_class impiden saldo
+ * negativo). "Sin saldo" se calcula en la página desde useStudentBalanceAlerts (Slice G), NUNCA una
+ * segunda fuente de saldo -- por eso no aparece acá como KPI propio de este módulo. */
 export interface DashboardKpis {
   activeStudents: KpiValue;
   activeTeachers: KpiValue;
   activeClassrooms: KpiValue;
-  todaySessionsCount: KpiValue;
-  pendingStudentPayments: KpiValue<{ count: number; totalAmount: number }>;
 }
 
-export interface DashboardSession {
+export type AcademicLevel = Database["public"]["Enums"]["academic_level"];
+
+/**
+ * Un bloque de la Agenda semanal (ajuste post-Slice H) -- PROYECCIÓN visual de un class_schedule
+ * (planificación referencial recurrente), nunca un class_record (la realidad de lo registrado).
+ * dayOfWeek/startTime/endTime son los valores crudos de class_schedules: la UI decide a qué fecha
+ * real corresponden según la semana seleccionada, este tipo no fija una fecha.
+ */
+export interface WeeklyAgendaBlock {
   id: number;
-  scheduledStart: string;
-  scheduledEnd: string;
+  classroomId: number;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
   classroomName: string;
-  teacherName: string | null;
-  status: Database["public"]["Enums"]["session_status"];
-}
-
-export interface ClassesToday {
-  mode: ClassesMode;
-  sessions: DashboardSession[];
+  studentName: string | null;
+  level: AcademicLevel | null;
+  programName: string | null;
+  /** classroom_teachers activos de este salón, por nombre -- 0 = "Sin profesor", 1 = su nombre,
+   * 2+ = "N profesores" (ver WeeklyAgenda.tsx). Nunca un solo profesor elegido arbitrariamente. */
+  teacherNames: string[];
 }
 
 export interface DashboardAlert {
@@ -70,7 +76,7 @@ export interface RecentStudent {
 
 export interface DashboardData {
   kpis: SectionResult<DashboardKpis>;
-  classes: SectionResult<ClassesToday>;
+  agenda: SectionResult<WeeklyAgendaBlock[]>;
   alerts: SectionResult<DashboardAlert[]>;
   recentActivity: SectionResult<DashboardActivityItem[]>;
   recentStudents: SectionResult<RecentStudent[]>;

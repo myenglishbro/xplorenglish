@@ -4,26 +4,20 @@ import { DataTable, type DataTableColumn } from "@/components/ui/surfaces/DataTa
 import { Tag } from "@/components/ui/core/Tag";
 import { formatMinutesAsHours } from "@/lib/format/minutes";
 import { formatShortDateInLima, formatTimeInLima } from "@/lib/datetime/lima";
-import { ATTENDANCE_STATUS_LABELS } from "@/server/scheduling/types";
 import type { StudentAttendanceHistoryItem } from "@/server/hours/types";
 
-/**
- * 100% solo lectura. minutesCharged === null se muestra SIEMPRE como "Pendiente" -- nunca el
- * status crudo (que por defecto es 'present' desde initialize_session_attendance y no representa
- * una decisión real todavía) -- mismo principio exacto que AttendanceSection (admin).
- */
+const STATUS_LABEL: Record<StudentAttendanceHistoryItem["status"], string> = {
+  present: "Presente",
+  absent: "Ausente",
+  rescheduled: "Reprogramada",
+};
+
+/** 100% solo lectura, fuente class_records (Slice A/F) -- cada fila ya nace con status/minutos
+ * definitivos, sin el estado transitorio "pendiente" del modelo viejo. */
 export function AttendanceHistoryTable({ items }: { items: StudentAttendanceHistoryItem[] }) {
   const columns: DataTableColumn<StudentAttendanceHistoryItem>[] = [
-    { key: "date", header: "Fecha", render: (row) => formatShortDateInLima(row.scheduledStart) },
-    {
-      key: "time",
-      header: "Hora",
-      render: (row) => (
-        <span style={{ whiteSpace: "nowrap" }}>
-          {formatTimeInLima(row.scheduledStart)}–{formatTimeInLima(row.scheduledEnd)}
-        </span>
-      ),
-    },
+    { key: "date", header: "Fecha", render: (row) => formatShortDateInLima(row.occurredAt) },
+    { key: "time", header: "Hora", render: (row) => formatTimeInLima(row.occurredAt) },
     {
       key: "classroomName",
       header: "Salón",
@@ -36,23 +30,13 @@ export function AttendanceHistoryTable({ items }: { items: StudentAttendanceHist
     {
       key: "status",
       header: "Asistencia",
-      render: (row) =>
-        row.minutesCharged === null ? (
-          <Tag tone="neutral" size="sm">
-            Pendiente
-          </Tag>
-        ) : (
-          <Tag tone={row.status === "present" ? "success" : row.status === "absent" ? "warning" : "danger"} size="sm">
-            {ATTENDANCE_STATUS_LABELS[row.status]}
-          </Tag>
-        ),
+      render: (row) => (
+        <Tag tone={row.status === "present" ? "success" : row.status === "absent" ? "warning" : "neutral"} size="sm">
+          {STATUS_LABEL[row.status]}
+        </Tag>
+      ),
     },
-    {
-      key: "minutesCharged",
-      header: "Minutos cobrados",
-      align: "right",
-      render: (row) => (row.minutesCharged === null ? "—" : formatMinutesAsHours(row.minutesCharged)),
-    },
+    { key: "minutes", header: "Minutos cobrados", align: "right", render: (row) => (row.minutes > 0 ? formatMinutesAsHours(row.minutes) : "—") },
   ];
 
   return <DataTable columns={columns} rows={items} dense />;

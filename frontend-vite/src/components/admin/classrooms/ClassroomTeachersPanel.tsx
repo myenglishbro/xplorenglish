@@ -2,165 +2,84 @@ import React from "react";
 import { Select } from "@/components/ui/forms/Select";
 import { Button } from "@/components/ui/core/Button";
 import { Alert } from "@/components/ui/feedback/Alert";
-import { Tag } from "@/components/ui/core/Tag";
-import { useAssignPrimaryTeacher, useAssignSubstituteTeacher, useRemoveClassroomTeacher } from "@/features/classroomsAdmin/hooks";
+import { useAddClassroomTeacher, useRemoveClassroomTeacher } from "@/features/classroomsAdmin/hooks";
 import type { AssignableTeacher, TeacherMembership } from "@/server/admin/classrooms/types";
-import { TEACHER_COMPATIBILITY_LABEL, TEACHER_COMPATIBILITY_TONE } from "@/server/scheduling/types";
-import type { ClassroomCompatibilityResult } from "@/server/scheduling/compatibility";
-
-const SECTION_LABEL_STYLE: React.CSSProperties = {
-  font: "var(--weight-bold) var(--text-micro-size)/1 var(--font-display)",
-  textTransform: "uppercase",
-  letterSpacing: ".08em",
-  color: "var(--text-muted)",
-  marginBottom: 8,
-};
 
 export interface ClassroomTeachersPanelProps {
   classroomId: number;
   teachers: TeacherMembership[];
   assignableTeachers: AssignableTeacher[];
-  /** Solo se usa para PRIMARY -- SUBSTITUTE sigue ofreciendo `assignableTeachers` sin filtrar. */
-  compatibility: ClassroomCompatibilityResult;
 }
 
-export function ClassroomTeachersPanel({ classroomId, teachers, assignableTeachers, compatibility }: ClassroomTeachersPanelProps) {
-  const assignPrimary = useAssignPrimaryTeacher(classroomId);
-  const assignSubstitute = useAssignSubstituteTeacher(classroomId);
+/**
+ * Profesores habilitados (Slice F) -- sin PRIMARY/SUBSTITUTE/titular/suplente (Slice A). Cualquier
+ * profesor habilitado puede registrar clases en este salón. Quitar a un profesor solo desactiva su
+ * membresía (status='inactive') -- nunca borra ni modifica sus class_records/pagos históricos.
+ */
+export function ClassroomTeachersPanel({ classroomId, teachers, assignableTeachers }: ClassroomTeachersPanelProps) {
+  const addTeacher = useAddClassroomTeacher(classroomId);
   const removeTeacher = useRemoveClassroomTeacher(classroomId);
-  const pending = assignPrimary.isPending || assignSubstitute.isPending || removeTeacher.isPending;
+  const pending = addTeacher.isPending || removeTeacher.isPending;
   const [error, setError] = React.useState<string | undefined>();
-  const [primarySelection, setPrimarySelection] = React.useState("");
-  const [substituteSelection, setSubstituteSelection] = React.useState("");
+  const [selection, setSelection] = React.useState("");
 
-  const primary = teachers.find((t) => t.role === "PRIMARY");
-  const substitutes = teachers.filter((t) => t.role === "SUBSTITUTE");
-  const teacherOptions = assignableTeachers.map((t) => ({ value: t.id, label: `${t.firstName} ${t.lastName}` }));
+  const enabledIds = new Set(teachers.map((t) => t.teacherId));
+  const candidates = assignableTeachers.filter((t) => !enabledIds.has(t.id));
+  const options = candidates.map((t) => ({ value: t.id, label: `${t.firstName} ${t.lastName}` }));
 
-  const compatibleTeachers = compatibility.teachers.filter((t) => t.status === "compatible");
-  const unavailableTeachers = compatibility.teachers.filter((t) => t.status !== "compatible");
-  const primaryOptions = compatibleTeachers.map((t) => ({ value: t.teacherId, label: `${t.firstName} ${t.lastName}` }));
-  const canAssignPrimary = compatibility.hasActiveSchedules && primaryOptions.some((option) => option.value === primarySelection);
-
-  async function handleAssignPrimary() {
-    if (!canAssignPrimary || pending) return;
+  async function handleAdd() {
+    if (!selection || pending) return;
     setError(undefined);
     try {
-      await assignPrimary.mutateAsync(primarySelection);
-      setPrimarySelection("");
+      await addTeacher.mutateAsync(selection);
+      setSelection("");
     } catch (err) {
       setError((err as Error).message);
     }
   }
 
-  async function handleAssignSubstitute() {
-    if (!substituteSelection || pending) return;
-    setError(undefined);
-    try {
-      await assignSubstitute.mutateAsync(substituteSelection);
-      setSubstituteSelection("");
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-
-  async function handleRemove(teacherId: string, role: TeacherMembership["role"]) {
+  async function handleRemove(teacherId: string) {
     if (pending) return;
     setError(undefined);
     try {
-      await removeTeacher.mutateAsync({ teacherId, role });
+      await removeTeacher.mutateAsync(teacherId);
     } catch (err) {
       setError((err as Error).message);
     }
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {error && <Alert tone="danger">{error}</Alert>}
 
-      {assignableTeachers.length === 0 && (
+      {teachers.length === 0 ? (
+        <div style={{ color: "var(--text-muted)" }}>Sin profesores habilitados todavía.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {teachers.map((t) => (
+            <div key={t.teacherId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>
+                {t.firstName} {t.lastName}
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => handleRemove(t.teacherId)} disabled={pending}>
+                Quitar
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {candidates.length === 0 && assignableTeachers.length === 0 && (
         <Alert tone="warning">Todavía no hay docentes activos. Promueve a un estudiante a docente desde Usuarios.</Alert>
       )}
 
-      <div>
-        <div style={SECTION_LABEL_STYLE}>Titular</div>
-        {primary ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {primary.firstName} {primary.lastName}
-              <Tag tone="brand" size="sm">Titular</Tag>
-            </span>
-            <Button variant="ghost" size="sm" onClick={() => handleRemove(primary.teacherId, "PRIMARY")} disabled={pending}>
-              Quitar
-            </Button>
-          </div>
-        ) : (
-          <div style={{ color: "var(--text-muted)", marginBottom: 8 }}>Sin titular asignado</div>
-        )}
-        {!compatibility.hasActiveSchedules && (
-          <Alert tone="warning">Define primero el horario del salón antes de asignar un docente titular.</Alert>
-        )}
-        {compatibility.hasActiveSchedules && primaryOptions.length === 0 && (
-          <Alert tone="warning">No hay docentes compatibles con el horario del salón.</Alert>
-        )}
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ flex: 1 }}>
-            <Select
-              value={canAssignPrimary ? primarySelection : ""}
-              options={primaryOptions}
-              placeholder="Elegir docente…"
-              onChange={(e) => setPrimarySelection(e.target.value)}
-              disabled={pending || !compatibility.hasActiveSchedules || primaryOptions.length === 0}
-            />
-          </div>
-          <Button variant="secondary" onClick={handleAssignPrimary} disabled={pending || !canAssignPrimary}>
-            {primary ? "Cambiar" : "Asignar"}
-          </Button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <Select value={selection} options={options} placeholder="Elegir docente…" onChange={(e) => setSelection(e.target.value)} disabled={pending} />
         </div>
-        {compatibility.hasActiveSchedules && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: "var(--space-3)" }}>
-            {[...compatibleTeachers, ...unavailableTeachers].map((teacher) => (
-              <div key={teacher.teacherId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                <span>{teacher.firstName} {teacher.lastName}</span>
-                <Tag tone={TEACHER_COMPATIBILITY_TONE[teacher.status]} size="sm">
-                  {TEACHER_COMPATIBILITY_LABEL[teacher.status]}
-                </Tag>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <div style={SECTION_LABEL_STYLE}>Suplentes</div>
-        {substitutes.length === 0 ? (
-          <div style={{ color: "var(--text-muted)", marginBottom: 8 }}>Sin suplentes</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
-            {substitutes.map((s) => (
-              <div key={s.teacherId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>{s.firstName} {s.lastName}</span>
-                <Button variant="ghost" size="sm" onClick={() => handleRemove(s.teacherId, "SUBSTITUTE")} disabled={pending}>
-                  Quitar
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ flex: 1 }}>
-            <Select
-              value={substituteSelection}
-              options={teacherOptions}
-              placeholder="Elegir docente…"
-              onChange={(e) => setSubstituteSelection(e.target.value)}
-              disabled={pending}
-            />
-          </div>
-          <Button variant="secondary" onClick={handleAssignSubstitute} disabled={pending || !substituteSelection}>
-            Agregar
-          </Button>
-        </div>
+        <Button variant="secondary" onClick={handleAdd} disabled={pending || !selection}>
+          Agregar
+        </Button>
       </div>
     </div>
   );

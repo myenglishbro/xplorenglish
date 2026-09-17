@@ -45,14 +45,10 @@ export function StudentSalonesPage() {
                     <Tag tone="neutral" size="sm">{c.programName}</Tag>
                     <Tag tone="neutral" size="sm">Nivel {c.level}</Tag>
                   </div>
-                  <div style={{ color: "var(--text-muted)", fontSize: "var(--text-body-sm-size)" }}>
-                    Docente: {c.primaryTeacherName ?? "Por asignar"}
-                  </div>
                   {c.description && <p style={{ margin: 0, color: "var(--text-body)" }}>{c.description}</p>}
                   {c.scheduleNotes && (
                     <div style={{ color: "var(--text-muted)", fontSize: "var(--text-caption-size)" }}>Notas: {c.scheduleNotes}</div>
                   )}
-                  <div style={{ color: "var(--text-muted)", fontSize: "var(--text-caption-size)" }}>{c.studentCount} estudiante{c.studentCount === 1 ? "" : "s"} en este salón</div>
                 </div>
               </Card>
             </Link>

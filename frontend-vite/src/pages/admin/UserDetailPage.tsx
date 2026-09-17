@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
-import { useUserDetail, useRoleChanges, usePrograms } from "@/features/users/hooks";
+import { useUserDetail, useRoleChanges, usePrograms, useArchiveUser, useRestoreUser } from "@/features/users/hooks";
 import type { UserRole } from "@/server/admin/users/types";
 import { Card } from "@/components/ui/surfaces/Card";
 import { Tag } from "@/components/ui/core/Tag";
@@ -12,6 +12,8 @@ import { StatusToggle } from "@/components/admin/users/StatusToggle";
 import { PromoteToTeacherPanel } from "@/components/admin/users/PromoteToTeacherPanel";
 import { ResetTempPasswordPanel } from "@/components/admin/users/ResetTempPasswordPanel";
 import { RoleChangesHistory } from "@/components/admin/users/RoleChangesHistory";
+import { ReasonConfirmButton } from "@/components/admin/ReasonConfirmButton";
+import { formatLongDateInLima } from "@/lib/datetime/lima";
 
 const ROLE_LABEL: Record<UserRole, string> = { admin: "Admin", teacher: "Docente", student: "Estudiante" };
 const ROLE_TONE: Record<UserRole, "brand" | "accent" | "neutral"> = { admin: "brand", teacher: "accent", student: "neutral" };
@@ -31,6 +33,8 @@ export function UserDetailPage() {
   const userQuery = useUserDetail(id ?? "");
   const roleChangesQuery = useRoleChanges(id ?? "");
   const programsQuery = usePrograms();
+  const archiveMutation = useArchiveUser(id ?? "");
+  const restoreMutation = useRestoreUser(id ?? "");
 
   if (userQuery.isLoading) {
     return (
@@ -48,6 +52,7 @@ export function UserDetailPage() {
   const roleChanges = roleChangesQuery.data ?? [];
   const programs = programsQuery.data ?? [];
   const isSelf = authUser?.id === user.id;
+  const isArchived = user.archivedAt !== null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
@@ -76,6 +81,7 @@ export function UserDetailPage() {
               Acceso {user.accessStatus === "activated" ? "activado" : "pendiente"}
             </Tag>
           )}
+          {isArchived && <Tag tone="neutral">Archivado</Tag>}
         </div>
       </div>
 
@@ -85,6 +91,65 @@ export function UserDetailPage() {
         </Card>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+          <Card header={cardTitle("Archivo")}>
+            {isArchived ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--text-body-sm-size)" }}>
+                  Archivado el {user.archivedAt ? formatLongDateInLima(new Date(user.archivedAt)) : "—"}. No aparece como candidato en salones ni
+                  puede promoverse a docente. Su historial y su cuenta no se ven afectados.
+                </p>
+                <ReasonConfirmButton
+                  label="Restaurar usuario"
+                  icon="arrow-counter-clockwise"
+                  variant="secondary"
+                  confirmTitle="Restaurar usuario"
+                  confirmDescription="El usuario vuelve a considerarse operativo (puede asignarse a salones, promoverse a docente, etc.). Esto no cambia su estado activo/inactivo."
+                  confirmLabel="Restaurar"
+                  reasonPlaceholder="Ej. corrección administrativa, reincorporación…"
+                  action={async (reason) => {
+                    try {
+                      await restoreMutation.mutateAsync(reason);
+                      return {};
+                    } catch (err) {
+                      return { error: err instanceof Error ? err.message : "No pudimos restaurar el usuario." };
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--text-body-sm-size)" }}>
+                  Archivar deja de considerar a este usuario como candidato operativo (no aparece para asignar a salones ni para promover a
+                  docente). No elimina su cuenta, historial, pagos ni clases.
+                </p>
+                <ReasonConfirmButton
+                  label="Archivar usuario"
+                  icon="archive"
+                  variant="secondary"
+                  destructive
+                  disabled={isSelf}
+                  confirmTitle="Archivar usuario"
+                  confirmDescription="El usuario deja de ser un candidato operativo. Su historial se conserva íntegro y puede restaurarse en cualquier momento."
+                  confirmLabel="Archivar"
+                  reasonPlaceholder="Ej. dejó la academia, cuenta duplicada…"
+                  action={async (reason) => {
+                    try {
+                      await archiveMutation.mutateAsync(reason);
+                      return {};
+                    } catch (err) {
+                      return { error: err instanceof Error ? err.message : "No pudimos archivar el usuario." };
+                    }
+                  }}
+                />
+                {isSelf && (
+                  <span style={{ font: "var(--weight-regular) var(--text-caption-size)/1.4 var(--font-body)", color: "var(--text-muted)" }}>
+                    No puedes archivar tu propio perfil.
+                  </span>
+                )}
+              </div>
+            )}
+          </Card>
+
           <Card header={cardTitle("Estado de la cuenta")}>
             <StatusToggle userId={user.id} status={user.status} isSelf={isSelf} />
             {user.accessStatus && (

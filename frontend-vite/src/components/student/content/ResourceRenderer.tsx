@@ -5,6 +5,14 @@ import { Button } from "@/components/ui/core/Button";
 import { detectKnownProvider, type KnownProviderType } from "@/lib/resources/providers";
 import type { ResourceItem } from "@/server/classrooms/content/types";
 
+/**
+ * Forma mínima que este componente realmente necesita -- estructural en vez de `ResourceItem`
+ * completo, para poder reutilizarse tal cual desde cualquier "título + URL" del proyecto (ej.
+ * documentos institucionales, ver features/institutionalDocuments) sin inventar lessonId/orderIndex
+ * falsos. `type` es opcional porque solo importa para el caso dormant `embed` (ver resolveRenderable).
+ */
+export type RenderableResource = Pick<ResourceItem, "title" | "reference"> & Partial<Pick<ResourceItem, "type">>;
+
 interface Renderable {
   mode: "iframe" | "link";
   embedUrl?: string;
@@ -18,7 +26,7 @@ interface Renderable {
  * (no expuesto en el formulario actual, conservado por compatibilidad futura): ahí `reference` ES
  * la URL de embed final, elegida por un admin, nunca por un usuario final.
  */
-function resolveRenderable(resource: ResourceItem): Renderable {
+function resolveRenderable(resource: RenderableResource): Renderable {
   const known = detectKnownProvider(resource.reference);
   if (known) return { mode: "iframe", embedUrl: known.embedUrl, providerType: known.type };
   if (resource.type === "embed") return { mode: "iframe", embedUrl: resource.reference, providerType: "embed" };
@@ -107,7 +115,7 @@ function ResourceLabel({ icon, text }: { icon: string; text: string }) {
   );
 }
 
-export function ResourceRenderer({ resource }: { resource: ResourceItem }) {
+export function ResourceRenderer({ resource }: { resource: RenderableResource }) {
   const renderable = resolveRenderable(resource);
 
   if (renderable.mode === "iframe" && renderable.embedUrl) {

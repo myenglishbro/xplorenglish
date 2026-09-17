@@ -41,12 +41,13 @@ interface ProfileListRow {
   status: string;
   must_change_password: boolean;
   created_at: string;
+  archived_at: string | null;
   program: { name: string } | null;
   account_invitations: { accepted_at: string | null } | null;
 }
 
 const LIST_SELECT =
-  "id, first_name, last_name, dni, phone, role, level, status, must_change_password, created_at, program:programs(name), account_invitations!account_invitations_profile_id_fkey(accepted_at)";
+  "id, first_name, last_name, dni, phone, role, level, status, must_change_password, created_at, archived_at, program:programs(name), account_invitations!account_invitations_profile_id_fkey(accepted_at)";
 
 function mapListRow(row: ProfileListRow): UserListItem {
   return {
@@ -61,6 +62,7 @@ function mapListRow(row: ProfileListRow): UserListItem {
     programName: row.program?.name ?? null,
     accessStatus: toAccessStatus(row.must_change_password, row.account_invitations),
     createdAt: row.created_at,
+    archivedAt: row.archived_at,
   };
 }
 
@@ -116,13 +118,14 @@ interface ProfileDetailRow {
   program_id: number | null;
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
   program: { name: string } | null;
   teacher_profile: { hourly_rate: number; status: string; bio: string | null } | null;
   account_invitations: { accepted_at: string | null } | null;
 }
 
 const DETAIL_SELECT = `
-  id, first_name, last_name, dni, phone, role, level, status, must_change_password, program_id, created_at, updated_at,
+  id, first_name, last_name, dni, phone, role, level, status, must_change_password, program_id, created_at, updated_at, archived_at,
   program:programs(name),
   teacher_profile:teacher_profiles!teacher_profiles_profile_id_fkey(hourly_rate, status, bio),
   account_invitations!account_invitations_profile_id_fkey(accepted_at)
@@ -156,6 +159,7 @@ export async function getUserDetail(supabase: Client, id: string): Promise<UserD
     teacherProfile: data.teacher_profile
       ? { hourlyRate: data.teacher_profile.hourly_rate, status: data.teacher_profile.status, bio: data.teacher_profile.bio }
       : null,
+    archivedAt: data.archived_at,
   };
 }
 

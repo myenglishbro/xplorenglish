@@ -8,6 +8,8 @@ import { StudentLayout } from "@/layouts/StudentLayout";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
 import { SalonDetailPage } from "@/pages/SalonDetailPage";
+import { PoliciesPage } from "@/pages/PoliciesPage";
+import { AuditLogPage } from "@/pages/admin/AuditLogPage";
 
 import { DashboardPage } from "@/pages/admin/DashboardPage";
 import { UsersListPage } from "@/pages/admin/UsersListPage";
@@ -26,21 +28,16 @@ import { ConfiguracionPage } from "@/pages/admin/ConfiguracionPage";
 import { PagosEstudiantesListPage } from "@/pages/admin/PagosEstudiantesListPage";
 import { PagoEstudianteDetailPage } from "@/pages/admin/PagoEstudianteDetailPage";
 import { PagosDocentesListPage } from "@/pages/admin/PagosDocentesListPage";
-import { PagoDocentePeriodoDetailPage } from "@/pages/admin/PagoDocentePeriodoDetailPage";
-import { CalendarioPage } from "@/pages/admin/CalendarioPage";
-import { SessionDetailAdminPage } from "@/pages/admin/SessionDetailAdminPage";
+import { PagoDocenteDetailPage } from "@/pages/admin/PagoDocenteDetailPage";
 
 import { TeacherHomePage } from "@/pages/teacher/TeacherHomePage";
 import { AvailabilityPage } from "@/pages/teacher/AvailabilityPage";
 import { TeacherSalonesPage } from "@/pages/teacher/SalonesPage";
-import { TeacherClasesPage } from "@/pages/teacher/ClasesPage";
 import { TeacherPagosPage } from "@/pages/teacher/PagosPage";
-import { TeacherPagoDetailPage } from "@/pages/teacher/PagoDetailPage";
 import { TeacherPerfilPage } from "@/pages/teacher/PerfilPage";
 
 import { StudentHomePage } from "@/pages/student/StudentHomePage";
 import { StudentSalonesPage } from "@/pages/student/SalonesPage";
-import { StudentClasesPage } from "@/pages/student/ClasesPage";
 import { StudentHorasPage } from "@/pages/student/HorasPage";
 import { StudentPerfilPage } from "@/pages/student/PerfilPage";
 import { StudentTestDeNivelPage } from "@/pages/student/TestDeNivelPage";
@@ -61,10 +58,9 @@ export const router = createBrowserRouter([
       { path: "disponibilidad", element: <AvailabilityPage /> },
       { path: "salones", element: <TeacherSalonesPage /> },
       { path: "salones/:id", element: <SalonDetailPage role="teacher" /> },
-      { path: "clases", element: <TeacherClasesPage /> },
       { path: "pagos", element: <TeacherPagosPage /> },
-      { path: "pagos/:id", element: <TeacherPagoDetailPage /> },
       { path: "perfil", element: <TeacherPerfilPage /> },
+      { path: "politicas", element: <PoliciesPage /> },
     ],
   },
   {
@@ -78,10 +74,10 @@ export const router = createBrowserRouter([
       { index: true, element: <StudentHomePage /> },
       { path: "salones", element: <StudentSalonesPage /> },
       { path: "salones/:id", element: <SalonDetailPage role="student" /> },
-      { path: "clases", element: <StudentClasesPage /> },
       { path: "horas", element: <StudentHorasPage /> },
       { path: "perfil", element: <StudentPerfilPage /> },
       { path: "test-de-nivel", element: <StudentTestDeNivelPage /> },
+      { path: "politicas", element: <PoliciesPage /> },
     ],
   },
   {
@@ -102,16 +98,16 @@ export const router = createBrowserRouter([
       { path: "salones", element: <SalonesPage /> },
       { path: "salones/nuevo", element: <NuevoSalonPage /> },
       { path: "salones/:id", element: <SalonDetailAdminPage /> },
-      { path: "calendario", element: <CalendarioPage /> },
-      { path: "calendario/:id", element: <SessionDetailAdminPage /> },
       { path: "paquetes", element: <PaquetesPage /> },
       { path: "paquetes/:studentId", element: <EstudianteHorasDetailPage /> },
       { path: "pagos-estudiantes", element: <PagosEstudiantesListPage /> },
       { path: "pagos-estudiantes/:id", element: <PagoEstudianteDetailPage /> },
       { path: "pagos-docentes", element: <PagosDocentesListPage /> },
-      { path: "pagos-docentes/:id", element: <PagoDocentePeriodoDetailPage /> },
+      { path: "pagos-docentes/:id", element: <PagoDocenteDetailPage /> },
       { path: "reportes", element: <ReportesPage /> },
       { path: "configuracion", element: <ConfiguracionPage /> },
+      { path: "auditoria", element: <AuditLogPage /> },
+      { path: "politicas", element: <PoliciesPage /> },
     ],
   },
   { path: "/", element: <LandingPage /> },

@@ -42,6 +42,9 @@ export interface UserListItem {
   programName: string | null;
   accessStatus: AccessStatus | null;
   createdAt: string;
+  /** No operativo, pero conserva todo su historial -- ver admin_archive_user/admin_restore_user.
+   * Independiente de `status`: un usuario archivado puede tener status='active' o 'inactive'. */
+  archivedAt: string | null;
 }
 
 export interface UserListResult {
@@ -77,6 +80,7 @@ export interface UserDetail {
   createdAt: string;
   updatedAt: string;
   teacherProfile: TeacherProfileSummary | null;
+  archivedAt: string | null;
 }
 
 export interface RoleChangeEntry {

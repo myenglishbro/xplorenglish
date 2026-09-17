@@ -39,6 +39,11 @@ export function usePrograms(options?: { activeOnly?: boolean }) {
 function invalidateUserQueries(queryClient: ReturnType<typeof useQueryClient>, profileId: string) {
   queryClient.invalidateQueries({ queryKey: ["admin-users"] });
   queryClient.invalidateQueries({ queryKey: queryKeys.adminUserDetail(profileId) });
+  // archived_at afecta elegibilidad en los pickers de "asignables" (classroomsAdmin) y en
+  // promote_user_to_teacher -- se invalidan también para que un archivado deje de aparecer ahí
+  // sin recargar la página.
+  queryClient.invalidateQueries({ queryKey: queryKeys.adminAssignableStudents() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.adminAssignableTeachers() });
 }
 
 export type UpdateUserProfileFieldErrors = Partial<Record<keyof UpdateUserProfileInput, string>>;
@@ -201,6 +206,45 @@ function parseUserEmailsRpcError(error: { message: string }): Error {
  * Route Handler que reemplaza, los consumidores ya normalizan con `emails[id] ?? null`.
  * Reutilizado tanto por Docentes (listado + detalle) como por Paquetes.
  */
+const ARCHIVE_RPC_ERROR_MESSAGES: Record<string, string> = {
+  NOT_AUTHORIZED: "No tienes permisos para realizar esta acción.",
+  PROFILE_NOT_FOUND: "El perfil no existe.",
+  ALREADY_ARCHIVED: "Este perfil ya está archivado.",
+  NOT_ARCHIVED: "Este perfil no está archivado.",
+  CANNOT_ARCHIVE_SELF: "No puedes archivar tu propio perfil.",
+};
+
+function parseArchiveRpcError(error: { message: string }): Error {
+  const code = error.message.split(":")[0]?.trim() ?? "";
+  return new Error(ARCHIVE_RPC_ERROR_MESSAGES[code] ?? "No pudimos completar la acción. Inténtalo de nuevo en unos minutos.");
+}
+
+/**
+ * admin_archive_user (ciclo de vida, versión reducida) -- solo profiles.archived_at + audit_logs.
+ * NUNCA elimina profiles/auth.users ni ningún historial. Restaurar (abajo) NO reactiva `status`.
+ */
+export function useArchiveUser(profileId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (reason: string) => {
+      const { error } = await supabase.rpc("admin_archive_user", { p_target_id: profileId, p_reason: reason.trim() || undefined });
+      if (error) throw parseArchiveRpcError(error);
+    },
+    onSuccess: () => invalidateUserQueries(queryClient, profileId),
+  });
+}
+
+export function useRestoreUser(profileId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (reason: string) => {
+      const { error } = await supabase.rpc("admin_restore_user", { p_target_id: profileId, p_reason: reason.trim() || undefined });
+      if (error) throw parseArchiveRpcError(error);
+    },
+    onSuccess: () => invalidateUserQueries(queryClient, profileId),
+  });
+}
+
 export function useUserEmails(ids: string[]) {
   return useQuery({
     queryKey: queryKeys.adminUserEmails(ids),

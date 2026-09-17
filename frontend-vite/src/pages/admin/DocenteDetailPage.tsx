@@ -17,7 +17,6 @@ function cardTitle(text: string) {
   );
 }
 
-const TEACHER_ROLE_LABEL: Record<string, string> = { PRIMARY: "Titular", SUBSTITUTE: "Suplente" };
 
 /** Portado de src/app/admin/docentes/[id]/page.tsx. */
 export function DocenteDetailPage() {
@@ -107,7 +106,6 @@ export function DocenteDetailPage() {
                     {c.name}
                   </span>
                   <Tag tone="neutral" size="sm">Nivel {c.level}</Tag>
-                  <Tag tone={c.role === "PRIMARY" ? "brand" : "accent"} size="sm">{TEACHER_ROLE_LABEL[c.role]}</Tag>
                 </div>
                 <Link to={`/admin/salones/${c.id}`} style={{ font: "var(--weight-semibold) 13px/1 var(--font-body)", color: "var(--text-accent)" }}>
                   Ver salón →

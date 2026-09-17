@@ -1,7 +1,9 @@
 import { Link, useLocation, useParams } from "react-router-dom";
-import { useClassroomDetail, useAssignableTeachers, useAssignableStudents, useClassroomCompatibility } from "@/features/classroomsAdmin/hooks";
+import { useClassroomDetail, useAssignableTeachers, useAssignableStudents } from "@/features/classroomsAdmin/hooks";
 import { usePrograms } from "@/features/users/hooks";
 import { useClassSchedules } from "@/features/schedulingAdmin/hooks";
+import { useContentTree } from "@/features/content/hooks";
+import { ClassroomClassesSection } from "@/features/classRecords/components/ClassroomClassesSection";
 import { Card } from "@/components/ui/surfaces/Card";
 import { Tag } from "@/components/ui/core/Tag";
 import { Icon } from "@/components/ui/core/Icon";
@@ -11,8 +13,9 @@ import { Alert } from "@/components/ui/feedback/Alert";
 import { ClassroomEditForm } from "@/components/admin/classrooms/ClassroomEditForm";
 import { ClassroomStatusToggle } from "@/components/admin/classrooms/ClassroomStatusToggle";
 import { ClassroomTeachersPanel } from "@/components/admin/classrooms/ClassroomTeachersPanel";
-import { ClassroomStudentsPanel } from "@/components/admin/classrooms/ClassroomStudentsPanel";
+import { ClassroomStudentPanel } from "@/components/admin/classrooms/ClassroomStudentPanel";
 import { WeeklyScheduleList } from "@/components/admin/scheduling/WeeklyScheduleList";
+import { ContentEditor } from "@/components/content/ContentEditor";
 
 function cardTitle(text: string) {
   return (
@@ -22,8 +25,12 @@ function cardTitle(text: string) {
   );
 }
 
-/** Portado de src/app/admin/salones/[id]/page.tsx. El botón "Ver contenido" (gestión de módulos
- * de contenido del salón) queda deliberadamente fuera de este pase -- ver informe final. */
+/**
+ * Detalle Admin de salón (Slice F) -- modelo nuevo: classrooms.student_id (un solo alumno),
+ * classroom_teachers sin PRIMARY/SUBSTITUTE ("profesores habilitados"), class_schedules como
+ * horario referencial, e historial de class_records (solo lectura -- Admin no registra/corrige
+ * clases en este slice).
+ */
 export function SalonDetailAdminPage() {
   const { id } = useParams<{ id: string }>();
   const classroomId = Number(id);
@@ -34,11 +41,8 @@ export function SalonDetailAdminPage() {
   const programsQuery = usePrograms();
   const assignableTeachersQuery = useAssignableTeachers();
   const assignableStudentsQuery = useAssignableStudents();
-  // Misma lista que ya trae assignableTeachersQuery -- se le pasa tal cual, así
-  // getClassroomTeacherCompatibility ya no vuelve a pedir teacher_profiles por su cuenta
-  // (performance slice 1). Queda deshabilitada hasta que esa lista llegue (ver hooks.ts).
-  const compatibilityQuery = useClassroomCompatibility(classroomId, assignableTeachersQuery.data);
   const classSchedulesQuery = useClassSchedules(classroomId);
+  const contentQuery = useContentTree(classroomId);
 
   if (!Number.isFinite(classroomId)) {
     return <EmptyState icon="warning" title="Este salón no existe">Vuelve al listado de Salones.</EmptyState>;
@@ -60,14 +64,11 @@ export function SalonDetailAdminPage() {
   const programs = programsQuery.data ?? [];
   const assignableTeachers = assignableTeachersQuery.data ?? [];
   const assignableStudents = assignableStudentsQuery.data ?? [];
-  const compatibility = compatibilityQuery.data ?? { hasActiveSchedules: false, schedules: [], teachers: [] };
   const schedules = classSchedulesQuery.data ?? [];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-      {justCreated && (
-        <Alert tone="info">Ahora configura el horario semanal y asigna el docente titular.</Alert>
-      )}
+      {justCreated && <Alert tone="info">Ahora configura el horario semanal, asigna el estudiante y habilita profesores.</Alert>}
 
       <div>
         <Link
@@ -101,7 +102,7 @@ export function SalonDetailAdminPage() {
           <Card header={cardTitle("Estado")}>
             <ClassroomStatusToggle classroomId={classroom.id} status={classroom.status} />
             <p style={{ marginTop: "var(--space-3)", font: "var(--weight-regular) var(--text-caption-size)/1.4 var(--font-body)", color: "var(--text-muted)" }}>
-              Archivar no borra ni desactiva a los docentes ni estudiantes asignados -- solo oculta el salón de sus listados. Al reactivarlo, sus miembros activos recuperan acceso automáticamente.
+              Archivar no borra ni desactiva al estudiante ni a los profesores asignados -- solo oculta el salón de sus listados.
             </p>
           </Card>
 
@@ -109,14 +110,31 @@ export function SalonDetailAdminPage() {
             <WeeklyScheduleList classroomId={classroom.id} schedules={schedules} />
           </Card>
 
-          <Card header={cardTitle("Docentes")}>
-            <ClassroomTeachersPanel classroomId={classroom.id} teachers={classroom.teachers} assignableTeachers={assignableTeachers} compatibility={compatibility} />
+          <Card header={cardTitle("Profesores habilitados")}>
+            <ClassroomTeachersPanel classroomId={classroom.id} teachers={classroom.teachers} assignableTeachers={assignableTeachers} />
           </Card>
         </div>
       </div>
 
-      <Card header={cardTitle("Estudiantes")}>
-        <ClassroomStudentsPanel classroomId={classroom.id} students={classroom.students} assignableStudents={assignableStudents} />
+      <Card header={cardTitle("Estudiante")}>
+        <ClassroomStudentPanel classroomId={classroom.id} student={classroom.student} assignableStudents={assignableStudents} />
+      </Card>
+
+      <div>
+        {cardTitle("Clases")}
+        <div style={{ marginTop: "var(--space-3)" }}>
+          <ClassroomClassesSection classroomId={classroom.id} hasStudent={!!classroom.student} role="admin" />
+        </div>
+      </div>
+
+      <Card header={cardTitle("Contenido del salón")}>
+        {contentQuery.isLoading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-4) 0" }}>
+            <Spinner size={24} label="Cargando contenido…" />
+          </div>
+        ) : (
+          <ContentEditor classroomId={classroom.id} modules={contentQuery.data ?? []} />
+        )}
       </Card>
     </div>
   );

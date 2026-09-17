@@ -1,7 +1,27 @@
 import type { Database } from "@/types/database.types";
-import type { AttendanceStatus } from "@/server/scheduling/types";
+import type { TagTone } from "@/components/ui/core/Tag";
 
 export type PackageStatus = Database["public"]["Enums"]["package_status"];
+export type ClassRecordStatus = Database["public"]["Enums"]["class_record_status"];
+
+/** Único lugar con las 5 etiquetas/tonos de package_status -- reutilizado por las tablas de
+ * paquetes de Admin y Student, y por el detalle de pago. Ciclo de vida (versión reducida):
+ * cancelled/refunded se agregan sin quitar los 3 estados existentes (active/exhausted/expired). */
+export const PACKAGE_STATUS_LABEL: Record<PackageStatus, string> = {
+  active: "Activo",
+  exhausted: "Agotado",
+  expired: "Vencido",
+  cancelled: "Cancelado",
+  refunded: "Reembolsado",
+};
+
+export const PACKAGE_STATUS_TONE: Record<PackageStatus, TagTone> = {
+  active: "success",
+  exhausted: "neutral",
+  expired: "danger",
+  cancelled: "neutral",
+  refunded: "warning",
+};
 
 /**
  * `remainingMinutes` NUNCA se infiere de `totalMinutes` -- se calcula sumando
@@ -21,20 +41,15 @@ export interface HoursPackageItem {
   status: PackageStatus;
 }
 
-/**
- * `minutesCharged === null` significa "todavía no se decidió" -- mismo principio exacto que
- * `AttendanceRosterItem` (server/scheduling/types.ts): nunca es evidencia de asistencia
- * confirmada, es el valor inicial técnico hasta que un admin factura la sesión.
- */
+/** Fuente única class_records (Slice A/F) -- cada fila ya nace con status/minutos definitivos, sin
+ * el estado transitorio "pendiente de facturación" del modelo viejo. */
 export interface StudentAttendanceHistoryItem {
   [key: string]: unknown;
-  attendanceId: number;
-  sessionId: number;
+  classRecordId: number;
   classroomName: string;
-  scheduledStart: string;
-  scheduledEnd: string;
-  status: AttendanceStatus;
-  minutesCharged: number | null;
+  occurredAt: string;
+  status: ClassRecordStatus;
+  minutes: number;
 }
 
 export interface StudentHoursSummary {

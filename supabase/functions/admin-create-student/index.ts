@@ -19,21 +19,44 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 
-const ALLOWED_ORIGIN = Deno.env.get("FRONTEND_VITE_ORIGIN") ?? "http://localhost:5173";
+// Allowlist explícita -- NUNCA "*". FRONTEND_VITE_ORIGIN cubre producción (configurable vía
+// `supabase secrets set`, sin redeploy); los dos puertos de Vite en dev (5173 default, 5174 si
+// 5173 ya está ocupado -- Vite incrementa el puerto automáticamente) están fijos en código porque
+// son puertos de desarrollador local, no un secreto de producción. Un origin fuera de esta lista
+// nunca recibe `Access-Control-Allow-Origin` en la respuesta (ver corsHeaders) -- el navegador
+// bloquea la respuesta del lado del cliente sin que haga falta rechazarlo explícitamente acá.
+const ALLOWED_ORIGINS = new Set(
+  [Deno.env.get("FRONTEND_VITE_ORIGIN") ?? "https://xplore-english.vercel.app", "http://localhost:5173", "http://localhost:5174"]
+);
 
-function corsHeaders(): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+// Lista canónica de @supabase/supabase-js/cors (SUPABASE_HEADERS) -- el cliente agrega
+// `X-Client-Info` a TODA request automáticamente (createClient, sin importar el caller), y
+// `Content-Type, Authorization` no bastan para que el preflight la deje pasar. Bug real
+// encontrado en producción (2026-09-15): con solo esas dos, cualquier llamada real vía
+// supabase.functions.invoke() fallaba el preflight con "Failed to fetch" -- nunca era un problema
+// de origin, sino de headers permitidos. Se usa la lista completa del SDK para cubrir también
+// x-retry-count/traceparent/tracestate/baggage si el SDK los llega a enviar en el futuro.
+const ALLOWED_HEADERS = "authorization, x-client-info, apikey, content-type, x-retry-count, traceparent, tracestate, baggage";
+
+function corsHeaders(requestOrigin: string | null): HeadersInit {
+  const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
     Vary: "Origin",
   };
+  // Refleja EXACTAMENTE el origin recibido solo si está en la allowlist -- nunca un valor fijo ni
+  // un wildcard. Sin este header, el navegador descarta la respuesta aunque el body/status estén
+  // bien formados: es la única puerta real de rechazo para un origin no autorizado.
+  if (requestOrigin && ALLOWED_ORIGINS.has(requestOrigin)) {
+    headers["Access-Control-Allow-Origin"] = requestOrigin;
+  }
+  return headers;
 }
 
-function json(body: unknown, status: number): Response {
+function jsonWithOrigin(body: unknown, status: number, requestOrigin: string | null): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json", ...corsHeaders() },
+    headers: { "Content-Type": "application/json", ...corsHeaders(requestOrigin) },
   });
 }
 
@@ -107,8 +130,14 @@ const PROVISION_ERROR_MESSAGES: Record<string, string> = {
 };
 
 Deno.serve(async (req: Request) => {
+  // Se lee UNA vez y se captura en `json` (closure) para el resto del handler -- así el resto del
+  // código no cambia su forma de llamar a `json(body, status)`, pero cada respuesta sigue
+  // reflejando el origin correcto de ESTA request.
+  const requestOrigin = req.headers.get("Origin") ?? req.headers.get("origin");
+  const json = (body: unknown, status: number) => jsonWithOrigin(body, status, requestOrigin);
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders() });
+    return new Response(null, { status: 204, headers: corsHeaders(requestOrigin) });
   }
   if (req.method !== "POST") {
     return json({ error: "Método no permitido." }, 405);

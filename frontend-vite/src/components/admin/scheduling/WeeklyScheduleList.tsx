@@ -14,10 +14,9 @@ export interface WeeklyScheduleListProps {
 }
 
 /**
- * Lista + alta/edición/baja de class_schedules de UN salón -- misma fuente de datos y mutaciones
- * que ClassSchedulesButton (Calendario), sin el <Select> de elegir salón porque acá el salón ya
- * está fijo. Usada tanto desde /admin/salones/:id como (indirectamente) desde el modal de
- * Horarios semanales en /admin/calendario.
+ * Lista + alta/edición/baja de class_schedules de UN salón, sin el <Select> de elegir salón porque
+ * acá el salón ya está fijo. Único consumidor actual: /admin/salones/:id (SalonDetailAdminPage) --
+ * el calendario global (/admin/calendario) fue retirado, ver components/admin/dashboard/Header.tsx.
  */
 export function WeeklyScheduleList({ classroomId, schedules }: WeeklyScheduleListProps) {
   return (

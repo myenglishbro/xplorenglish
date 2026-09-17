@@ -13,6 +13,10 @@ export interface SidebarNavItem {
   /** Renders an uppercase group heading above this item. */
   section?: string;
   badge?: string | number;
+  /** When present, renders this item as a real `<a target="_blank" rel="noopener noreferrer">`
+   * instead of an internal-navigation button -- for links that leave the app (e.g. WhatsApp
+   * support). `value` still identifies the item (React key / never matches the active route). */
+  href?: string;
 }
 
 export interface SidebarNavProps {
@@ -61,30 +65,57 @@ export function SidebarNav({ items = [], value, onChange, footer, assetBase = "/
                   {it.section}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => onChange?.(it.value)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  height: 44,
-                  padding: "0 12px",
-                  border: 0,
-                  cursor: "pointer",
-                  textAlign: "left",
-                  borderRadius: "var(--radius-md)",
-                  background: act ? "var(--surface-selected)" : "transparent",
-                  color: act ? "var(--cyan-700)" : "var(--text-body)",
-                  font: `var(--weight-${act ? "bold" : "medium"}) 14.5px/1 var(--font-body)`,
-                  boxShadow: act ? "inset 3px 0 0 var(--xp-cyan)" : "none",
-                  transition: "var(--transition-control)",
-                }}
-              >
-                <Icon name={it.icon} weight={act ? "fill" : "regular"} size={20} color={act ? "var(--xp-cyan)" : "var(--text-muted)"} />
-                <span style={{ flex: 1 }}>{it.label}</span>
-                {it.badge && <Badge tone={act ? "accent" : "danger"}>{it.badge}</Badge>}
-              </button>
+              {it.href ? (
+                <a
+                  href={it.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    height: 44,
+                    padding: "0 12px",
+                    border: 0,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    textDecoration: "none",
+                    borderRadius: "var(--radius-md)",
+                    background: "transparent",
+                    color: "var(--text-body)",
+                    font: "var(--weight-medium) 14.5px/1 var(--font-body)",
+                    transition: "var(--transition-control)",
+                  }}
+                >
+                  <Icon name={it.icon} weight="regular" size={20} color="var(--text-muted)" />
+                  <span style={{ flex: 1 }}>{it.label}</span>
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onChange?.(it.value)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    height: 44,
+                    padding: "0 12px",
+                    border: 0,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    borderRadius: "var(--radius-md)",
+                    background: act ? "var(--surface-selected)" : "transparent",
+                    color: act ? "var(--cyan-700)" : "var(--text-body)",
+                    font: `var(--weight-${act ? "bold" : "medium"}) 14.5px/1 var(--font-body)`,
+                    boxShadow: act ? "inset 3px 0 0 var(--xp-cyan)" : "none",
+                    transition: "var(--transition-control)",
+                  }}
+                >
+                  <Icon name={it.icon} weight={act ? "fill" : "regular"} size={20} color={act ? "var(--xp-cyan)" : "var(--text-muted)"} />
+                  <span style={{ flex: 1 }}>{it.label}</span>
+                  {it.badge && <Badge tone={act ? "accent" : "danger"}>{it.badge}</Badge>}
+                </button>
+              )}
             </React.Fragment>
           );
         })}

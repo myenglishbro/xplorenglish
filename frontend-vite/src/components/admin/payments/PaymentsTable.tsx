@@ -5,7 +5,7 @@ import { formatCurrencyAmount } from "@/lib/format/currency";
 import { formatMinutesAsHours } from "@/lib/format/minutes";
 import { formatShortDateInLima } from "@/lib/datetime/lima";
 import type { PaymentListItem, PaymentStatus } from "@/server/payments/types";
-import type { PackageStatus } from "@/server/hours/types";
+import { PACKAGE_STATUS_LABEL, PACKAGE_STATUS_TONE } from "@/server/hours/types";
 
 const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
   pending: "Pendiente",
@@ -19,18 +19,6 @@ const PAYMENT_STATUS_TONE: Record<PaymentStatus, TagTone> = {
   completed: "success",
   failed: "danger",
   refunded: "neutral",
-};
-
-const PACKAGE_STATUS_LABEL: Record<PackageStatus, string> = {
-  active: "Activo",
-  exhausted: "Agotado",
-  expired: "Vencido",
-};
-
-const PACKAGE_STATUS_TONE: Record<PackageStatus, TagTone> = {
-  active: "success",
-  exhausted: "neutral",
-  expired: "danger",
 };
 
 export function PaymentsTable({ payments }: { payments: PaymentListItem[] }) {

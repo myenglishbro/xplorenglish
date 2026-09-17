@@ -3,7 +3,7 @@ import type { FinancialMonthlyTrendPoint } from "@/server/reports/types";
 
 const SERIES = [
   { key: "collectedIncome", label: "Ingresos", color: "var(--cyan-600)" },
-  { key: "generatedTeacherCost", label: "Costo docente", color: "var(--orange-500)" },
+  { key: "generatedTeacherCost", label: "Costo docente generado", color: "var(--orange-500)" },
   { key: "otherExpenses", label: "Otros gastos", color: "var(--red-500)" },
 ] as const;
 

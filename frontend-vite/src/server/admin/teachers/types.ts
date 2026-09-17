@@ -14,7 +14,7 @@ export interface TeacherListItem {
   phone: string;
   hourlyRate: number;
   /** teacher_profiles.status -- "¿está operativo como docente?" (lo que de verdad gatea
-   * start_session/asignaciones). Distinto de accountStatus. */
+   * register_class/correct_class vía private.require_active_teacher). Distinto de accountStatus. */
   teacherStatus: TeacherProfileStatus;
   /** profiles.status -- "¿la cuenta en general está activa?" (login, visibilidad en /admin/usuarios).
    * Se muestra en el detalle, no en el listado (ver decisión en admin/docentes/page.tsx). */

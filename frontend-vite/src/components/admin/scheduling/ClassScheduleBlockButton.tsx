@@ -22,8 +22,8 @@ export interface ClassScheduleBlockButtonProps {
 
 const DAY_OPTIONS = DAY_OF_WEEK_LABELS.map((label, index) => ({ value: String(index), label }));
 
-/** Espejo de AvailabilityBlockButton (features/availability) -- mismo patrón día/inicio/fin,
- * aplicado a class_schedules en vez de teacher_availability. */
+/** Alta/edición de un bloque de class_schedules (día/inicio/fin) -- horario semanal REFERENCIAL de
+ * un salón, distinto de teacher_availability (ver features/availability/components/WeeklyAvailabilityGrid). */
 export function ClassScheduleBlockButton({
   mode,
   classroomId,

@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { Icon } from "@/components/ui/core/Icon";
 
+/** "Calendario" se retiró: apuntaba a /admin/calendario, una ruta que ya no existe en el router
+ * (el horario semanal ahora vive en la Agenda semanal de este mismo Dashboard). */
 const QUICK_ACTIONS = [
   { href: "/admin/usuarios", label: "Usuarios", icon: "users-three" },
   { href: "/admin/salones", label: "Salones", icon: "chalkboard" },
-  { href: "/admin/calendario", label: "Calendario", icon: "calendar-blank" },
   { href: "/admin/pagos-docentes", label: "Pagos docentes", icon: "money" },
 ] as const;
 

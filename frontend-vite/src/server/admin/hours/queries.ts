@@ -83,7 +83,7 @@ interface MovementRow {
  * admin. hours_movements.student_id ya identifica al estudiante directamente (no hace falta pasar
  * por package_id), mismo criterio de acceso admin que listHourPackagesForAdmin
  * (hours_movements_select_own, 0007). Sin ninguna agregación ni interpretación: cada fila es un
- * hecho ya escrito por create_hour_package / set_student_session_billing (0009).
+ * hecho ya escrito por create_hour_package (compra) o register_class/correct_class (consumo).
  */
 export async function listHoursMovementsForStudent(supabase: Client, studentId: string): Promise<AdminHoursMovementItem[]> {
   const { data, error } = await supabase

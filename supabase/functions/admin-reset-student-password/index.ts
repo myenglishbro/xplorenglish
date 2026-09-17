@@ -15,23 +15,37 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// Mismo criterio que lib/cors.ts (Next): un único origen explícito, nunca "*". Secret configurado
-// vía `supabase secrets set FRONTEND_VITE_ORIGIN=...`; default al puerto de dev de Vite.
-const ALLOWED_ORIGIN = Deno.env.get("FRONTEND_VITE_ORIGIN") ?? "http://localhost:5173";
+// Allowlist explícita -- NUNCA "*". Mismo criterio que admin-create-student (ver ese archivo para
+// el razonamiento completo): FRONTEND_VITE_ORIGIN cubre producción (configurable vía
+// `supabase secrets set`, sin redeploy); los dos puertos de Vite en dev están fijos en código.
+const ALLOWED_ORIGINS = new Set(
+  [Deno.env.get("FRONTEND_VITE_ORIGIN") ?? "https://xplore-english.vercel.app", "http://localhost:5173", "http://localhost:5174"]
+);
 
-function corsHeaders(): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+// Lista canónica de @supabase/supabase-js/cors (SUPABASE_HEADERS) -- ver admin-create-student
+// para el bug real que esto corrige (X-Client-Info, que el SDK agrega siempre, no estaba
+// permitido y hacía fallar el preflight con "Failed to fetch" en cualquier llamada real).
+const ALLOWED_HEADERS = "authorization, x-client-info, apikey, content-type, x-retry-count, traceparent, tracestate, baggage";
+
+function corsHeaders(requestOrigin: string | null): HeadersInit {
+  const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
     Vary: "Origin",
   };
+  // Refleja EXACTAMENTE el origin recibido solo si está en la allowlist -- nunca un valor fijo ni
+  // un wildcard. Sin este header, el navegador descarta la respuesta aunque el body/status estén
+  // bien formados: es la única puerta real de rechazo para un origin no autorizado.
+  if (requestOrigin && ALLOWED_ORIGINS.has(requestOrigin)) {
+    headers["Access-Control-Allow-Origin"] = requestOrigin;
+  }
+  return headers;
 }
 
-function json(body: unknown, status: number): Response {
+function jsonWithOrigin(body: unknown, status: number, requestOrigin: string | null): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json", ...corsHeaders() },
+    headers: { "Content-Type": "application/json", ...corsHeaders(requestOrigin) },
   });
 }
 
@@ -82,8 +96,13 @@ function generateTempPassword(): string {
 }
 
 Deno.serve(async (req: Request) => {
+  // Se lee UNA vez y se captura en `json` (closure) para el resto del handler -- ver
+  // admin-create-student para el mismo patrón.
+  const requestOrigin = req.headers.get("Origin") ?? req.headers.get("origin");
+  const json = (body: unknown, status: number) => jsonWithOrigin(body, status, requestOrigin);
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders() });
+    return new Response(null, { status: 204, headers: corsHeaders(requestOrigin) });
   }
   if (req.method !== "POST") {
     return json({ error: "Método no permitido." }, 405);

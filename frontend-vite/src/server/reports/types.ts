@@ -12,18 +12,23 @@ export interface FinancialReportPeriod {
 export interface FinancialReportKpis {
   /** SUM(student_payments.amount) WHERE status='completed' AND paid_at ∈ periodo. */
   collectedIncome: number;
-  /** SUM(teacher_hours_log.amount) atribuido por sessions.actual_end ∈ periodo. */
+  /** "Costo docente generado": SUM(class_records.amount) WHERE status IN ('present','absent') AND
+   * amount IS NOT NULL, atribuido por occurred_at ∈ periodo. Se cuenta aunque todavía no se le haya
+   * pagado al profesor -- es una obligación generada, no una salida de caja. */
   generatedTeacherCost: number;
-  /** SUM(teacher_payment_periods.total_amount) WHERE status='paid' AND paid_at ∈ periodo. */
+  /** "Docentes pagados": SUM(teacher_payments.total_amount) WHERE paid_at ∈ periodo. Salida de caja
+   * real -- puede diferir de generatedTeacherCost del mismo periodo, y eso es correcto. */
   paidTeachers: number;
-  /** Deuda docente acumulada a la fecha, TODAS las fechas -- misma fuente que Slice 3
-   * (listTeacherDebtSummary), nunca una segunda fórmula. No depende del periodo seleccionado. */
+  /** "Deuda docente actual": SUM(class_records.amount) WHERE status IN ('present','absent') AND
+   * amount IS NOT NULL AND teacher_payment_id IS NULL, SIEMPRE a la fecha actual -- nunca una
+   * segunda fórmula ni acotada a `range` (stock, no flujo del periodo). */
   pendingTeachers: number;
-  /** SUM(business_expenses.amount) WHERE expense_date ∈ periodo. */
+  /** SUM(business_expenses.amount) WHERE expense_date ∈ periodo. NUNCA incluye teacher_payments. */
   otherExpenses: number;
-  /** collectedIncome - generatedTeacherCost - otherExpenses. */
+  /** "Resultado operativo" (NO "ganancia neta"): collectedIncome - generatedTeacherCost -
+   * otherExpenses. */
   operatingResult: number;
-  /** collectedIncome - paidTeachers - otherExpenses. */
+  /** "Flujo de caja": collectedIncome - paidTeachers - otherExpenses. */
   cashFlow: number;
 }
 

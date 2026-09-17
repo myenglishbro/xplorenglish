@@ -1,16 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-import { getTodayRangeInLima } from "@/lib/datetime/lima";
 import type {
-  ClassesToday,
   DashboardActivityItem,
   DashboardAlert,
   DashboardData,
   DashboardKpis,
-  DashboardSession,
   KpiValue,
   RecentStudent,
   SectionResult,
+  WeeklyAgendaBlock,
 } from "./types";
 
 type Client = SupabaseClient<Database>;
@@ -24,16 +22,25 @@ function toCountKpi(res: { count: number | null; error: unknown }): KpiValue {
   return { status: "ok", value: res.count ?? 0 };
 }
 
+/** classroom_teachers.teacher_id y class_records/teacher_payments.teacher_id son directamente el
+ * id de profiles (teacher_profiles.profile_id es su PK y coincide con profiles.id) -- un solo
+ * batch fetch, sin pasar por teacher_profiles. */
+async function fetchProfileNames(supabase: Client, ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase.from("profiles").select("id, first_name, last_name").in("id", ids);
+  if (error) throw error;
+  return new Map(data.map((p) => [p.id, `${p.first_name} ${p.last_name}`]));
+}
+
 /**
- * 5 KPIs, cada uno aislado: si una consulta falla, las otras 4 se muestran igual --
- * un KPI en error nunca se confunde con un 0 real (ver KpiValue en ./types).
+ * 3 KPIs, cada uno aislado (ver KpiValue en ./types). Ajuste post-Slice H: se retiran
+ * "Clases de hoy" (class_schedules es planificación referencial) y "Pagos estudiantes pendientes"
+ * (no existe venta a crédito en el modelo actual) -- "Sin saldo" vive en la página, reutilizando
+ * useStudentBalanceAlerts (Slice G), no una query nueva acá.
  */
-export async function getDashboardKpis(
-  supabase: Client,
-  todayRange: { start: Date; end: Date }
-): Promise<SectionResult<DashboardKpis>> {
+export async function getDashboardKpis(supabase: Client): Promise<SectionResult<DashboardKpis>> {
   try {
-    const [studentsRes, teachersRes, classroomsRes, sessionsRes, paymentsRes] = await Promise.all([
+    const [studentsRes, teachersRes, classroomsRes] = await Promise.all([
       supabase
         .from("profiles")
         .select("id", { count: "exact", head: true })
@@ -44,23 +51,7 @@ export async function getDashboardKpis(
         .select("profile_id", { count: "exact", head: true })
         .eq("status", "active"),
       supabase.from("classrooms").select("id", { count: "exact", head: true }).eq("status", "active"),
-      supabase
-        .from("sessions")
-        .select("id", { count: "exact", head: true })
-        .gte("scheduled_start", todayRange.start.toISOString())
-        .lt("scheduled_start", todayRange.end.toISOString()),
-      supabase.from("student_payments").select("amount").eq("status", "pending"),
     ]);
-
-    const pendingStudentPayments: KpiValue<{ count: number; totalAmount: number }> = paymentsRes.error
-      ? { status: "error" }
-      : {
-          status: "ok",
-          value: {
-            count: paymentsRes.data.length,
-            totalAmount: paymentsRes.data.reduce((sum, row) => sum + Number(row.amount), 0),
-          },
-        };
 
     return {
       status: "ok",
@@ -68,8 +59,6 @@ export async function getDashboardKpis(
         activeStudents: toCountKpi(studentsRes),
         activeTeachers: toCountKpi(teachersRes),
         activeClassrooms: toCountKpi(classroomsRes),
-        todaySessionsCount: toCountKpi(sessionsRes),
-        pendingStudentPayments,
       },
     };
   } catch (err) {
@@ -77,157 +66,136 @@ export async function getDashboardKpis(
   }
 }
 
-interface SessionEmbedRow {
+interface AgendaScheduleRow {
   id: number;
-  scheduled_start: string;
-  scheduled_end: string;
-  status: Database["public"]["Enums"]["session_status"];
-  classroom: { name: string } | null;
-  scheduled_teacher: { profiles: { first_name: string; last_name: string } | null } | null;
-  actual_teacher: { profiles: { first_name: string; last_name: string } | null } | null;
+  classroom_id: number;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  classroom: {
+    name: string;
+    level: Database["public"]["Enums"]["academic_level"];
+    student_id: string | null;
+    program: { name: string } | null;
+  } | null;
 }
 
-const SESSION_SELECT = `
-  id,
-  scheduled_start,
-  scheduled_end,
-  status,
-  classroom:classrooms(name),
-  scheduled_teacher:teacher_profiles!sessions_scheduled_teacher_id_fkey(profiles(first_name,last_name)),
-  actual_teacher:teacher_profiles!sessions_actual_teacher_id_fkey(profiles(first_name,last_name))
+const AGENDA_SELECT = `
+  id, classroom_id, day_of_week, start_time, end_time,
+  classroom:classrooms!inner(name, level, status, student_id, program:programs(name))
 `;
 
-function mapSessionRow(row: SessionEmbedRow): DashboardSession {
-  const teacherProfile = row.actual_teacher?.profiles ?? row.scheduled_teacher?.profiles ?? null;
-  return {
-    id: row.id,
-    scheduledStart: row.scheduled_start,
-    scheduledEnd: row.scheduled_end,
-    classroomName: row.classroom?.name ?? "Salón sin nombre",
-    teacherName: teacherProfile ? `${teacherProfile.first_name} ${teacherProfile.last_name}` : null,
-    status: row.status,
-  };
+/** Todos los profesores activos por salón (no solo uno) -- la Agenda necesita distinguir "sin
+ * profesor" / "un profesor" (nombre) / "N profesores", nunca elegir uno arbitrariamente. */
+async function fetchActiveTeacherNamesByClassroom(supabase: Client, classroomIds: number[]): Promise<Map<number, string[]>> {
+  if (classroomIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from("classroom_teachers")
+    .select("classroom_id, teacher_id")
+    .eq("status", "active")
+    .in("classroom_id", classroomIds);
+  if (error) throw error;
+
+  const names = await fetchProfileNames(supabase, [...new Set(data.map((r) => r.teacher_id))]);
+
+  const byClassroom = new Map<number, string[]>();
+  for (const row of data) {
+    const name = names.get(row.teacher_id);
+    if (!name) continue;
+    const list = byClassroom.get(row.classroom_id) ?? [];
+    list.push(name);
+    byClassroom.set(row.classroom_id, list);
+  }
+  return byClassroom;
 }
 
 /**
- * Clases de hoy (día calendario en America/Lima, ver getTodayRangeInLima). Si no hay
- * ninguna, cae a las próximas 5 sesiones futuras, marcadas explícitamente
- * mode:"upcoming" -- nunca se mezclan en silencio con las de hoy.
+ * Agenda semanal (ajuste post-Slice H) -- PROYECCIÓN visual del horario semanal recurrente
+ * (class_schedules), NUNCA class_records. Un solo fetch de todos los class_schedules activos de
+ * salones activos (sin filtrar por semana: la recurrencia es la misma toda semana, la UI decide qué
+ * fechas reales corresponden a dayOfWeek según la semana seleccionada) + 2 batch fetches (nombres de
+ * alumno, profesores por salón) -- 3 round-trips fijos, nunca uno por schedule.
  */
-export async function getClassesToday(supabase: Client, now: Date): Promise<SectionResult<ClassesToday>> {
+export async function getWeeklyAgenda(supabase: Client): Promise<SectionResult<WeeklyAgendaBlock[]>> {
   try {
-    const todayRange = getTodayRangeInLima(now);
+    const { data, error } = await supabase
+      .from("class_schedules")
+      .select(AGENDA_SELECT)
+      .eq("is_active", true)
+      .eq("classrooms.status", "active")
+      .returns<AgendaScheduleRow[]>();
 
-    const { data: todayRows, error: todayError } = await supabase
-      .from("sessions")
-      .select(SESSION_SELECT)
-      .gte("scheduled_start", todayRange.start.toISOString())
-      .lt("scheduled_start", todayRange.end.toISOString())
-      .neq("status", "cancelled")
-      .order("scheduled_start", { ascending: true })
-      .returns<SessionEmbedRow[]>();
+    if (error) throw error;
 
-    if (todayError) throw todayError;
+    const studentIds = [...new Set(data.map((r) => r.classroom?.student_id).filter((id): id is string => !!id))];
+    const classroomIds = [...new Set(data.map((r) => r.classroom_id))];
 
-    if (todayRows.length > 0) {
-      return { status: "ok", data: { mode: "today", sessions: todayRows.map(mapSessionRow) } };
-    }
+    const [studentNames, teacherNamesByClassroom] = await Promise.all([
+      fetchProfileNames(supabase, studentIds),
+      fetchActiveTeacherNamesByClassroom(supabase, classroomIds),
+    ]);
 
-    const { data: upcomingRows, error: upcomingError } = await supabase
-      .from("sessions")
-      .select(SESSION_SELECT)
-      .gte("scheduled_start", now.toISOString())
-      .eq("status", "scheduled")
-      .order("scheduled_start", { ascending: true })
-      .limit(5)
-      .returns<SessionEmbedRow[]>();
+    const blocks: WeeklyAgendaBlock[] = data.map((row) => ({
+      id: row.id,
+      classroomId: row.classroom_id,
+      dayOfWeek: row.day_of_week,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      classroomName: row.classroom?.name ?? "Salón sin nombre",
+      studentName: row.classroom?.student_id ? (studentNames.get(row.classroom.student_id) ?? null) : null,
+      level: row.classroom?.level ?? null,
+      programName: row.classroom?.program?.name ?? null,
+      teacherNames: teacherNamesByClassroom.get(row.classroom_id) ?? [],
+    }));
 
-    if (upcomingError) throw upcomingError;
-
-    return { status: "ok", data: { mode: "upcoming", sessions: upcomingRows.map(mapSessionRow) } };
+    return { status: "ok", data: blocks };
   } catch (err) {
     return errorSection(err);
   }
 }
 
 /**
- * Las 4 alertas del MVP v1. Se calculan juntas y fallan cerradas: si cualquiera de las
- * consultas falla, toda la sección se reporta en error en vez de omitir en silencio
- * justo la alerta que falló (una alerta ausente por error se vería igual que "todo
- * bien", que es precisamente lo que no debe pasar en una alerta).
+ * Alertas operativas del dashboard admin. Ya no hay PRIMARY/SUBSTITUTE (classroom_without_primary)
+ * ni sesiones programadas que puedan quedar "vencidas sin resolver" (sessions no existe), ni flujo
+ * de recibos/periodos docentes (teacher_payment_periods no existe, pay_teacher_classes paga
+ * directo). Sus equivalentes reales: salón activo sin ningún profesor habilitado, y clases ya
+ * registradas (PRESENT/ABSENT con monto) que siguen sin pagarse.
  */
-export async function getDashboardAlerts(supabase: Client, now: Date): Promise<SectionResult<DashboardAlert[]>> {
+export async function getDashboardAlerts(supabase: Client): Promise<SectionResult<DashboardAlert[]>> {
   try {
-    const [
-      { data: activeClassrooms, error: classroomsError },
-      { data: primaryTeacherRows, error: primariesError },
-      { count: overdueCount, error: overdueError },
-      { count: pendingReceiptCount, error: pendingReceiptError },
-      { count: awaitingPaymentCount, error: awaitingPaymentError },
-    ] = await Promise.all([
-      supabase.from("classrooms").select("id, name").eq("status", "active"),
+    const [{ data: classroomRows, error: classroomsError }, { count: pendingPaymentCount, error: pendingPaymentError }] = await Promise.all([
+      supabase.from("classrooms").select("id, name, classroom_teachers(status)").eq("status", "active"),
       supabase
-        .from("classroom_teachers")
-        .select("classroom_id")
-        .eq("teacher_role", "PRIMARY")
-        .eq("status", "active"),
-      supabase
-        .from("sessions")
+        .from("class_records")
         .select("id", { count: "exact", head: true })
-        .eq("status", "scheduled")
-        .lt("scheduled_end", now.toISOString()),
-      supabase
-        .from("teacher_payment_periods")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending_receipt"),
-      supabase
-        .from("teacher_payment_periods")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "approved"),
+        .is("teacher_payment_id", null)
+        .not("amount", "is", null)
+        .in("status", ["present", "absent"]),
     ]);
 
     if (classroomsError) throw classroomsError;
-    if (primariesError) throw primariesError;
-    if (overdueError) throw overdueError;
-    if (pendingReceiptError) throw pendingReceiptError;
-    if (awaitingPaymentError) throw awaitingPaymentError;
+    if (pendingPaymentError) throw pendingPaymentError;
 
     const alerts: DashboardAlert[] = [];
 
-    const primaryClassroomIds = new Set(primaryTeacherRows.map((r) => r.classroom_id));
-    const classroomsWithoutPrimary = activeClassrooms.filter((c) => !primaryClassroomIds.has(c.id));
-    if (classroomsWithoutPrimary.length > 0) {
+    const classroomsWithoutTeacher = classroomRows.filter(
+      (c) => !c.classroom_teachers.some((t) => t.status === "active"),
+    );
+    if (classroomsWithoutTeacher.length > 0) {
       alerts.push({
-        kind: "classroom_without_primary",
-        label: "Salones activos sin docente PRIMARY",
-        detail: classroomsWithoutPrimary.map((c) => c.name).join(", "),
+        kind: "classroom_without_teacher",
+        label: "Salones activos sin ningún profesor habilitado",
+        detail: classroomsWithoutTeacher.map((c) => c.name).join(", "),
         href: "/admin/salones",
       });
     }
 
-    if ((overdueCount ?? 0) > 0) {
+    if ((pendingPaymentCount ?? 0) > 0) {
       alerts.push({
-        kind: "session_overdue_unresolved",
-        label: "Sesiones vencidas sin resolver",
-        detail: `${overdueCount} sesión(es) programada(s) cuyo horario ya pasó y sigue sin marcarse como completada, cancelada o reprogramada`,
-        href: "/admin/calendario",
-      });
-    }
-
-    if ((pendingReceiptCount ?? 0) > 0) {
-      alerts.push({
-        kind: "teacher_period_pending_receipt",
-        label: "Periodos docentes esperando recibo",
-        detail: `${pendingReceiptCount} periodo(s) esperando que el docente suba su recibo`,
-        href: "/admin/pagos-docentes",
-      });
-    }
-
-    if ((awaitingPaymentCount ?? 0) > 0) {
-      alerts.push({
-        kind: "teacher_period_awaiting_payment",
-        label: "Periodos docentes aprobados sin pagar",
-        detail: `${awaitingPaymentCount} periodo(s) aprobado(s) pendiente(s) de pago`,
+        kind: "teacher_classes_pending_payment",
+        label: "Clases registradas pendientes de pago a docentes",
+        detail: `${pendingPaymentCount} clase(s) registrada(s) que todavía no se han pagado`,
         href: "/admin/pagos-docentes",
       });
     }
@@ -246,17 +214,18 @@ interface PaymentActivityRow {
   student: { first_name: string; last_name: string } | null;
 }
 
-interface PeriodActivityRow {
+interface TeacherPaymentRow {
   id: number;
+  teacher_id: string;
   total_amount: number;
-  paid_at: string | null;
-  teacher: { profiles: { first_name: string; last_name: string } | null } | null;
+  paid_at: string;
 }
 
-/** Actividad reciente unificada: pagos de estudiantes completados + periodos docentes pagados. */
+/** Actividad reciente unificada: pagos de estudiantes completados + pagos a docentes (teacher_payments,
+ * reemplaza teacher_payment_periods eliminada en Slice A). */
 export async function getRecentActivity(supabase: Client): Promise<SectionResult<DashboardActivityItem[]>> {
   try {
-    const [paymentsRes, periodsRes] = await Promise.all([
+    const [paymentsRes, teacherPaymentsRes] = await Promise.all([
       supabase
         .from("student_payments")
         .select("id, amount, paid_at, created_at, student:profiles(first_name,last_name)")
@@ -265,18 +234,17 @@ export async function getRecentActivity(supabase: Client): Promise<SectionResult
         .limit(10)
         .returns<PaymentActivityRow[]>(),
       supabase
-        .from("teacher_payment_periods")
-        .select(
-          "id, total_amount, paid_at, teacher:teacher_profiles!teacher_payment_periods_teacher_id_fkey(profiles(first_name,last_name))"
-        )
-        .eq("status", "paid")
+        .from("teacher_payments")
+        .select("id, teacher_id, total_amount, paid_at")
         .order("paid_at", { ascending: false })
         .limit(10)
-        .returns<PeriodActivityRow[]>(),
+        .returns<TeacherPaymentRow[]>(),
     ]);
 
     if (paymentsRes.error) throw paymentsRes.error;
-    if (periodsRes.error) throw periodsRes.error;
+    if (teacherPaymentsRes.error) throw teacherPaymentsRes.error;
+
+    const teacherNames = await fetchProfileNames(supabase, [...new Set(teacherPaymentsRes.data.map((r) => r.teacher_id))]);
 
     const paymentItems: DashboardActivityItem[] = paymentsRes.data.map((row) => ({
       kind: "student_payment_completed",
@@ -286,19 +254,15 @@ export async function getRecentActivity(supabase: Client): Promise<SectionResult
       occurredAt: row.paid_at ?? row.created_at,
     }));
 
-    const periodItems: DashboardActivityItem[] = periodsRes.data
-      .filter((row): row is PeriodActivityRow & { paid_at: string } => row.paid_at !== null)
-      .map((row) => ({
-        kind: "teacher_period_paid",
-        id: row.id,
-        personName: row.teacher?.profiles
-          ? `${row.teacher.profiles.first_name} ${row.teacher.profiles.last_name}`
-          : "Docente",
-        amount: row.total_amount,
-        occurredAt: row.paid_at,
-      }));
+    const teacherPaymentItems: DashboardActivityItem[] = teacherPaymentsRes.data.map((row) => ({
+      kind: "teacher_period_paid",
+      id: row.id,
+      personName: teacherNames.get(row.teacher_id) ?? "Docente",
+      amount: row.total_amount,
+      occurredAt: row.paid_at,
+    }));
 
-    const merged = [...paymentItems, ...periodItems]
+    const merged = [...paymentItems, ...teacherPaymentItems]
       .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
       .slice(0, 8);
 
@@ -332,13 +296,11 @@ export async function getRecentStudents(supabase: Client): Promise<SectionResult
   }
 }
 
-export async function getDashboardData(supabase: Client, now: Date = new Date()): Promise<DashboardData> {
-  const todayRange = getTodayRangeInLima(now);
-
-  const [kpis, classes, alerts, recentActivity, recentStudents] = await Promise.allSettled([
-    getDashboardKpis(supabase, todayRange),
-    getClassesToday(supabase, now),
-    getDashboardAlerts(supabase, now),
+export async function getDashboardData(supabase: Client): Promise<DashboardData> {
+  const [kpis, agenda, alerts, recentActivity, recentStudents] = await Promise.allSettled([
+    getDashboardKpis(supabase),
+    getWeeklyAgenda(supabase),
+    getDashboardAlerts(supabase),
     getRecentActivity(supabase),
     getRecentStudents(supabase),
   ]);
@@ -349,7 +311,7 @@ export async function getDashboardData(supabase: Client, now: Date = new Date())
 
   return {
     kpis: unwrap(kpis),
-    classes: unwrap(classes),
+    agenda: unwrap(agenda),
     alerts: unwrap(alerts),
     recentActivity: unwrap(recentActivity),
     recentStudents: unwrap(recentStudents),

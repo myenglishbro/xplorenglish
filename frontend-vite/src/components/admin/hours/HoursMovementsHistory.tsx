@@ -11,7 +11,7 @@ const MOVEMENT_TYPE_LABEL: Record<string, string> = {
 };
 
 /** Ledger crudo, solo lectura -- cada fila es un hecho ya registrado (create_hour_package /
- * set_student_session_billing), nunca algo que esta pantalla calcule o permita editar. */
+ * register_class / correct_class), nunca algo que esta pantalla calcule o permita editar. */
 export function HoursMovementsHistory({ movements }: { movements: AdminHoursMovementItem[] }) {
   if (movements.length === 0) {
     return (

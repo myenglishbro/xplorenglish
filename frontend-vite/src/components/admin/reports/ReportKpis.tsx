@@ -13,8 +13,8 @@ export function ReportKpis({ kpis }: { kpis: FinancialReportKpis }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
-        <StatCard label="Ingresos cobrados" value={money(kpis.collectedIncome)} icon="credit-card" tone="accent" />
-        <StatCard label="Costo docente" value={money(kpis.generatedTeacherCost)} icon="chalkboard-teacher" tone="accent" />
+        <StatCard label="Ingresos" value={money(kpis.collectedIncome)} icon="credit-card" tone="accent" />
+        <StatCard label="Costo docente generado" value={money(kpis.generatedTeacherCost)} icon="chalkboard-teacher" tone="accent" />
         <StatCard label="Otros gastos" value={money(kpis.otherExpenses)} icon="receipt" tone="accent" />
         <StatCard
           label="Resultado operativo"
@@ -24,8 +24,8 @@ export function ReportKpis({ kpis }: { kpis: FinancialReportKpis }) {
         />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
-        <StatCard label="Pagado a profesores" value={money(kpis.paidTeachers)} icon="check-circle" tone="accent" />
-        <StatCard label="Pendiente a profesores" value={money(kpis.pendingTeachers)} icon="clock-countdown" tone="accent" />
+        <StatCard label="Docentes pagados" value={money(kpis.paidTeachers)} icon="check-circle" tone="accent" />
+        <StatCard label="Deuda docente actual" value={money(kpis.pendingTeachers)} icon="clock-countdown" tone="accent" />
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <StatCard
             label="Flujo de caja"
@@ -35,7 +35,7 @@ export function ReportKpis({ kpis }: { kpis: FinancialReportKpis }) {
           />
           {kpis.pendingTeachers > 0 && (
             <span style={{ font: "var(--weight-medium) var(--text-caption-size)/1.4 var(--font-body)", color: "var(--text-muted)", padding: "0 4px" }}>
-              {money(kpis.pendingTeachers)} pendientes de pago a profesores -- no lo cuentes como dinero libre.
+              {money(kpis.pendingTeachers)} de deuda docente actual -- no lo cuentes como dinero libre.
             </span>
           )}
         </div>

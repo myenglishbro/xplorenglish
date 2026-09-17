@@ -8,14 +8,11 @@ export interface MyClassroomItem {
   name: string;
   programName: string;
   level: Database["public"]["Enums"]["academic_level"];
-  role: Database["public"]["Enums"]["classroom_teacher_role"];
   description: string | null;
   scheduleNotes: string | null;
-  studentCount: number;
 }
 
 interface Row {
-  teacher_role: Database["public"]["Enums"]["classroom_teacher_role"];
   classroom: {
     id: number;
     name: string;
@@ -23,25 +20,18 @@ interface Row {
     description: string | null;
     schedule_notes: string | null;
     program: { name: string } | null;
-    classroom_students: { status: Database["public"]["Enums"]["membership_status"] }[];
   } | null;
 }
 
 /**
- * .eq("teacher_id", teacherId) es necesario aunque RLS ya limite qué salones son visibles: la
- * policy de classroom_teachers (can_access_classroom) también deja ver, en un salón propio, las
- * filas de OTROS docentes de ese mismo salón -- sin este filtro, un docente vería su propia fila
- * mezclada con las de sus co-docentes en el mismo resultado.
- *
- * RLS (private.is_classroom_teacher, 0015) ya excluye salones archivados -- no hace falta
- * filtrar classrooms.status aquí.
+ * Sin PRIMARY/SUBSTITUTE (Slice A/F) -- cualquier fila activa es un profesor habilitado. .eq("status",
+ * "active") filtra solo LA MEMBRESÍA de este profesor en cada salón (si lo deshabilitaron, deja de
+ * aparecer en su lista, aunque su historial de class_records se conserve intacto).
  */
 export async function listMyClassroomsAsTeacher(supabase: Client, teacherId: string): Promise<MyClassroomItem[]> {
   const { data, error } = await supabase
     .from("classroom_teachers")
-    .select(
-      `teacher_role, classroom:classrooms(id, name, level, description, schedule_notes, program:programs(name), classroom_students(status))`
-    )
+    .select(`classroom:classrooms(id, name, level, description, schedule_notes, program:programs(name))`)
     .eq("teacher_id", teacherId)
     .eq("status", "active")
     .returns<Row[]>();
@@ -55,10 +45,8 @@ export async function listMyClassroomsAsTeacher(supabase: Client, teacherId: str
       name: row.classroom.name,
       programName: row.classroom.program?.name ?? "—",
       level: row.classroom.level,
-      role: row.teacher_role,
       description: row.classroom.description,
       scheduleNotes: row.classroom.schedule_notes,
-      studentCount: row.classroom.classroom_students.filter((s) => s.status === "active").length,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

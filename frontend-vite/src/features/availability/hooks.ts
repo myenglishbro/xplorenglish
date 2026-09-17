@@ -1,45 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/auth/useAuth";
-import { getMyAvailability, createAvailabilityBlock, updateAvailabilityBlock, deleteAvailabilityBlock } from "./api";
-import type { AvailabilityBlockInput } from "./validation";
-
-function availabilityKey(teacherId: string | undefined) {
-  return ["teacher-availability", teacherId] as const;
-}
+import { queryKeys } from "@/lib/queryKeys";
+import { getMyAvailability, setMyAvailability } from "./api";
+import type { AvailabilityBlockDraft } from "./types";
 
 export function useAvailability() {
   const { user } = useAuth();
   return useQuery({
-    queryKey: availabilityKey(user?.id),
+    queryKey: queryKeys.availability(user?.id),
     queryFn: () => getMyAvailability(supabase),
     enabled: !!user,
   });
 }
 
-export function useCreateAvailability() {
+/** Guarda toda la semana de una sola vez (Slice D) -- la grilla consolida celdas contiguas en
+ * bloques antes de llamar a esto, nunca un RPC por celda. */
+export function useSetAvailability() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: (input: AvailabilityBlockInput) => createAvailabilityBlock(supabase, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: availabilityKey(user?.id) }),
-  });
-}
-
-export function useUpdateAvailability() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: ({ id, input }: { id: number; input: AvailabilityBlockInput }) => updateAvailabilityBlock(supabase, id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: availabilityKey(user?.id) }),
-  });
-}
-
-export function useDeleteAvailability() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: (id: number) => deleteAvailabilityBlock(supabase, id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: availabilityKey(user?.id) }),
+    mutationFn: (blocks: AvailabilityBlockDraft[]) => setMyAvailability(supabase, blocks),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.availability(user?.id) }),
   });
 }

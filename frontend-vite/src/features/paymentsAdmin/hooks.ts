@@ -74,6 +74,13 @@ export function useCreateHourPackage() {
       queryClient.invalidateQueries({ queryKey: ["admin-student-payments"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.adminHourPackages() });
       queryClient.invalidateQueries({ queryKey: queryKeys.adminStudentHoursMovements(variables.studentId) });
+      // Slice G -- el top-up cambia el saldo del estudiante (hours_movements): refresca todo lo que
+      // lo muestra dentro de esta misma sesión (Admin: listado de salones + alertas; Student, si
+      // comparte sesión/tab: su propio dashboard).
+      queryClient.invalidateQueries({ queryKey: ["admin-classrooms"] });
+      queryClient.invalidateQueries({ queryKey: ["student-balance-alerts"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.studentBalance(variables.studentId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.hoursPackages(variables.studentId) });
     },
   });
 }

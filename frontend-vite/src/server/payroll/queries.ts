@@ -1,228 +1,133 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-import type {
-  PayrollPeriodListItem,
-  PayrollPeriodDetail,
-  PayrollHourItem,
-  PayrollReceiptSummary,
-  PayrollPeriodStatus,
-  TeacherDebtSummaryItem,
+import {
+  classRecordFinancialStatus,
+  type PayTeacherClassesResult,
+  type TeacherPaymentStatementRow,
+  type TeacherPaymentSummaryItem,
 } from "./types";
 
 type Client = SupabaseClient<Database>;
 
-interface PeriodRow {
-  id: number;
-  teacher_id: string;
-  period_start: string;
-  period_end: string;
-  total_minutes: number;
-  total_amount: number;
-  status: PayrollPeriodStatus;
-  paid_at: string | null;
-  teacher: { profile: { first_name: string; last_name: string } | null } | null;
-}
-
-const PERIOD_SELECT = `
-  id, teacher_id, period_start, period_end, total_minutes, total_amount, status, paid_at,
-  teacher:teacher_profiles!teacher_payment_periods_teacher_id_fkey(profile:profiles!teacher_profiles_profile_id_fkey(first_name, last_name))
-`;
-
-function teacherNameOf(row: PeriodRow): string {
-  const p = row.teacher?.profile;
-  return p ? `${p.first_name} ${p.last_name}` : "—";
-}
-
 /**
- * 2 round-trips fijos, sin importar cuántos periodos haya -- nunca una query por fila:
- * 1) teacher_payment_periods + nombre del docente, vía el mismo embed encadenado
- *    (teacher_profiles -> profiles) ya usado en server/dashboard/queries.ts;
- * 2) teacher_receipts de esos IDs en una sola llamada (.in), solo para armar el flag
- *    hasReceipt -- nunca una fila completa por periodo.
+ * Un solo round-trip (admin_teacher_payment_summary, Slice E) -- los totales pendientes se
+ * calculan enteramente en la DB desde class_records (PRESENT/ABSENT, amount no nulo,
+ * teacher_payment_id nulo), nunca aquí. Incluye a todo profesor activo aunque su deuda sea 0.
  */
-export async function listPayrollPeriods(supabase: Client): Promise<PayrollPeriodListItem[]> {
-  const { data: rows, error } = await supabase
-    .from("teacher_payment_periods")
-    .select(PERIOD_SELECT)
-    .order("period_start", { ascending: false })
-    .returns<PeriodRow[]>();
-
+export async function getTeacherPaymentSummaries(supabase: Client): Promise<TeacherPaymentSummaryItem[]> {
+  const { data, error } = await supabase.rpc("admin_teacher_payment_summary");
   if (error) throw error;
-  if (rows.length === 0) return [];
 
-  const periodIds = rows.map((r) => r.id);
-  const { data: receipts, error: receiptsError } = await supabase
-    .from("teacher_receipts")
-    .select("teacher_payment_period_id")
-    .in("teacher_payment_period_id", periodIds);
-
-  if (receiptsError) throw receiptsError;
-  const withReceipt = new Set(receipts.map((r) => r.teacher_payment_period_id));
-
-  return rows.map((r) => ({
-    id: r.id,
-    teacherId: r.teacher_id,
-    teacherName: teacherNameOf(r),
-    periodStart: r.period_start,
-    periodEnd: r.period_end,
-    totalMinutes: r.total_minutes,
-    totalAmount: r.total_amount,
-    status: r.status,
-    hasReceipt: withReceipt.has(r.id),
+  return data.map((row) => ({
+    teacherId: row.teacher_id,
+    teacherName: `${row.first_name} ${row.last_name}`,
+    pendingClassCount: row.pending_class_count,
+    pendingMinutes: row.pending_minutes,
+    pendingAmount: row.pending_amount,
+    lastClassAt: row.last_class_at,
   }));
 }
 
-interface HourRow {
-  id: number;
-  session_id: number;
-  billable_minutes: number;
-  hourly_rate_snapshot: number;
-  amount: number;
-  session: { scheduled_start: string; classroom: { name: string } | null } | null;
+export async function getTeacherName(supabase: Client, teacherId: string): Promise<string> {
+  const { data, error } = await supabase.from("profiles").select("first_name, last_name").eq("id", teacherId).single();
+  if (error) throw error;
+  return `${data.first_name} ${data.last_name}`;
 }
 
-interface ReceiptRow {
+interface StatementRawRow {
   id: number;
-  file_path: string;
-  uploaded_at: string;
+  occurred_at: string;
+  status: Database["public"]["Enums"]["class_record_status"];
+  minutes: number;
+  notes: string | null;
+  hourly_rate_snapshot: number | null;
+  amount: number | null;
+  teacher_payment_id: number | null;
+  classroom: { name: string } | null;
+  student: { first_name: string; last_name: string } | null;
+  payment: { paid_at: string } | null;
 }
 
 /**
- * Específica para un solo id (detalle admin de un periodo) -- 3 queries en paralelo (periodo,
- * horas, recibo). No se combinan en una sola llamada porque teacher_receipts no tiene FK hacia
- * teacher_hours_log (son 2 tablas independientes, ambas relacionadas solo con el periodo) --
- * cada una ya viene acotada por teacher_payment_period_id, así que 3 queries puntuales son más
- * simples y igual de baratas que forzar un único select artificial.
+ * Estado de cuenta cronológico de un profesor (más reciente arriba) -- un solo round-trip vía
+ * embeds de PostgREST (classroom, alumno, pago si existe). RLS admin-only ya cubierto por
+ * class_records_admin_write/class_records_select (Slice A).
  */
-export async function getPayrollPeriodDetail(supabase: Client, periodId: number): Promise<PayrollPeriodDetail | null> {
-  const [periodResult, hoursResult, receiptResult] = await Promise.all([
-    supabase.from("teacher_payment_periods").select(PERIOD_SELECT).eq("id", periodId).maybeSingle().returns<PeriodRow | null>(),
-    supabase
-      .from("teacher_hours_log")
-      .select("id, session_id, billable_minutes, hourly_rate_snapshot, amount, session:sessions(scheduled_start, classroom:classrooms(name))")
-      .eq("teacher_payment_period_id", periodId)
-      .returns<HourRow[]>(),
-    supabase
-      .from("teacher_receipts")
-      .select("id, file_path, uploaded_at")
-      .eq("teacher_payment_period_id", periodId)
-      .maybeSingle()
-      .returns<ReceiptRow | null>(),
-  ]);
+export async function getTeacherPaymentStatement(supabase: Client, teacherId: string): Promise<TeacherPaymentStatementRow[]> {
+  const { data, error } = await supabase
+    .from("class_records")
+    .select(
+      `
+      id, occurred_at, status, minutes, notes, hourly_rate_snapshot, amount, teacher_payment_id,
+      classroom:classrooms(name),
+      student:profiles!class_records_student_id_fkey(first_name, last_name),
+      payment:teacher_payments(paid_at)
+    `,
+    )
+    .eq("teacher_id", teacherId)
+    .order("occurred_at", { ascending: false })
+    .returns<StatementRawRow[]>();
 
-  if (periodResult.error) throw periodResult.error;
-  if (hoursResult.error) throw hoursResult.error;
-  if (receiptResult.error) throw receiptResult.error;
-
-  const period = periodResult.data;
-  if (!period) return null;
-
-  const hours: PayrollHourItem[] = hoursResult.data
-    .filter((h): h is HourRow & { session: NonNullable<HourRow["session"]> } => !!h.session)
-    .map((h) => ({
-      id: h.id,
-      sessionId: h.session_id,
-      classroomName: h.session.classroom?.name ?? "—",
-      sessionDate: h.session.scheduled_start,
-      billableMinutes: h.billable_minutes,
-      hourlyRateSnapshot: h.hourly_rate_snapshot,
-      amount: h.amount,
-    }))
-    .sort((a, b) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime());
-
-  const receiptRow = receiptResult.data;
-  const receipt: PayrollReceiptSummary | null = receiptRow
-    ? { id: receiptRow.id, filePath: receiptRow.file_path, uploadedAt: receiptRow.uploaded_at }
-    : null;
-
-  return {
-    id: period.id,
-    teacherId: period.teacher_id,
-    teacherName: teacherNameOf(period),
-    periodStart: period.period_start,
-    periodEnd: period.period_end,
-    totalMinutes: period.total_minutes,
-    totalAmount: period.total_amount,
-    status: period.status,
-    paidAt: period.paid_at,
-    hours,
-    receipt,
-  };
-}
-
-interface DebtHourRow {
-  teacher_id: string;
-  amount: number;
-  // Embed nullable (teacher_payment_period_id puede ser null) -- null significa "todavía sin
-  // agrupar en ningún periodo", que para efectos de deuda es exactamente lo mismo que un periodo
-  // pending/approved/etc: no está pagado.
-  teacher_payment_period: { status: PayrollPeriodStatus } | null;
-  teacher: { profile: { first_name: string; last_name: string } | null } | null;
-  // sessions.actual_end es la fecha económica real de la clase (ver decisión de arquitectura
-  // financiera) -- actual_start queda solo como fallback técnico, nunca created_at del log.
-  session: { actual_start: string | null; actual_end: string | null } | null;
-}
-
-const DEBT_SELECT = `
-  teacher_id, amount,
-  teacher_payment_period:teacher_payment_periods(status),
-  teacher:teacher_profiles!teacher_hours_log_teacher_id_fkey(profile:profiles!teacher_profiles_profile_id_fkey(first_name, last_name)),
-  session:sessions(actual_start, actual_end)
-`;
-
-/** Dinero en centavos enteros mientras se acumula -- evita que sumar muchas filas numeric(10,2)
- * como float introduzca un error de redondeo que rompa la igualdad exacta pendiente = generado -
- * pagado (ver Slice 3, punto 12: la prueba financiera exige que esa igualdad se cumpla al centavo). */
-function toCents(amount: number): number {
-  return Math.round(amount * 100);
-}
-
-/**
- * Source of truth: teacher_hours_log.amount (importe ya calculado y congelado por complete_session
- * -- nunca se recalcula horas × teacher_profiles.hourly_rate actual). RLS
- * (teacher_hours_log_select_own, 0008) ya permite a un admin ver todas las filas -- esta query es
- * de un solo round-trip, sin service_role ni RPC nueva.
- *
- * Se incluye a TODOS los docentes que alguna vez generaron una fila en teacher_hours_log, sin
- * filtrar por teacher_profiles.status: un docente inactivo con saldo pendiente debe seguir
- * apareciendo (Slice 3, punto 6). Los suplentes ya están resueltos correctamente por el modelo --
- * teacher_hours_log.teacher_id es siempre sessions.actual_teacher_id (quien realmente dictó),
- * nunca el titular del salón; esta query solo agrupa por esa columna, sin volver a decidir nada.
- */
-export async function listTeacherDebtSummary(supabase: Client): Promise<TeacherDebtSummaryItem[]> {
-  const { data, error } = await supabase.from("teacher_hours_log").select(DEBT_SELECT).returns<DebtHourRow[]>();
   if (error) throw error;
 
-  const byTeacher = new Map<string, { name: string; generatedCents: number; paidCents: number; lastClassAt: string | null }>();
+  return data.map((row) => ({
+    id: row.id,
+    occurredAt: row.occurred_at,
+    status: row.status,
+    minutes: row.minutes,
+    notes: row.notes,
+    hourlyRateSnapshot: row.hourly_rate_snapshot,
+    amount: row.amount,
+    teacherPaymentId: row.teacher_payment_id,
+    paidAt: row.payment?.paid_at ?? null,
+    classroomName: row.classroom?.name ?? "—",
+    studentName: row.student ? `${row.student.first_name} ${row.student.last_name}` : "—",
+    financialStatus: classRecordFinancialStatus(row.status, row.teacher_payment_id),
+  }));
+}
 
-  for (const row of data) {
-    const entry = byTeacher.get(row.teacher_id) ?? {
-      name: row.teacher?.profile ? `${row.teacher.profile.first_name} ${row.teacher.profile.last_name}` : "—",
-      generatedCents: 0,
-      paidCents: 0,
-      lastClassAt: null,
-    };
+const PAY_RPC_ERROR_MESSAGES: Record<string, string> = {
+  UNAUTHENTICATED: "Tu sesión expiró. Vuelve a iniciar sesión.",
+  NOT_AUTHORIZED: "Esta operación es exclusiva para administradores.",
+  INVALID_INPUT: "Faltan datos para completar el pago.",
+  EMPTY_SELECTION: "Selecciona al menos una clase.",
+  DUPLICATE_IDS: "La selección contiene clases duplicadas.",
+  CLASS_RECORD_NOT_FOUND: "Alguna de las clases seleccionadas ya no existe.",
+  INVALID_SELECTION: "Alguna clase ya fue pagada o dejó de ser válida. Actualiza la página e inténtalo de nuevo.",
+};
 
-    const cents = toCents(Number(row.amount));
-    entry.generatedCents += cents;
-    // Únicamente 'paid' cuenta como pagado -- pending/pending_receipt/receipt_uploaded/approved
-    // (incluido null, sin periodo todavía) siguen siendo deuda pendiente.
-    if (row.teacher_payment_period?.status === "paid") entry.paidCents += cents;
+function parsePayError(error: { message: string }): Error {
+  const code = error.message.split(":")[0]?.trim() ?? "";
+  return new Error(PAY_RPC_ERROR_MESSAGES[code] ?? "No pudimos procesar el pago. Inténtalo de nuevo en unos minutos.");
+}
 
-    const sessionDate = row.session?.actual_end ?? row.session?.actual_start ?? null;
-    if (sessionDate && (!entry.lastClassAt || sessionDate > entry.lastClassAt)) entry.lastClassAt = sessionDate;
+/**
+ * Único punto de escritura de un pago real (Slice E). El backend recalcula/valida todo -- este
+ * cliente nunca envía minutos ni montos, solo los ids seleccionados y el profesor.
+ */
+export async function payTeacherClasses(
+  supabase: Client,
+  teacherId: string,
+  classRecordIds: number[],
+  reference: string | null,
+): Promise<PayTeacherClassesResult> {
+  const { data, error } = await supabase
+    .rpc("pay_teacher_classes", {
+      p_teacher_id: teacherId,
+      p_class_record_ids: classRecordIds,
+      p_reference: reference ?? undefined,
+    })
+    .single();
 
-    byTeacher.set(row.teacher_id, entry);
-  }
+  if (error) throw parsePayError(error);
 
-  return Array.from(byTeacher.entries())
-    .map(([teacherId, v]) => ({
-      teacherId,
-      teacherName: v.name,
-      generatedAmount: v.generatedCents / 100,
-      paidAmount: v.paidCents / 100,
-      pendingAmount: (v.generatedCents - v.paidCents) / 100,
-      lastClassAt: v.lastClassAt,
-    }))
-    .sort((a, b) => b.pendingAmount - a.pendingAmount || a.teacherName.localeCompare(b.teacherName));
+  return {
+    paymentId: data.payment_id,
+    teacherId: data.teacher_id,
+    paidAt: data.paid_at,
+    totalMinutes: data.total_minutes,
+    totalAmount: data.total_amount,
+    reference: data.reference,
+    classRecordIds: data.class_record_ids,
+  };
 }

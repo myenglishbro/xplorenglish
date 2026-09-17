@@ -19,6 +19,11 @@ export interface CourseViewerProps {
    * solo-lectura, edición deferida) -- a dónde vuelve el botón "Volver". */
   backTo?: string;
   backLabel?: string;
+  /** Slice F.1: slot opcional en el header compacto existente (ej. el control de tabs
+   * Contenido/Información del salón de SalonDetailPage) -- evita un segundo header duplicado
+   * encima de este componente, que ya trae su propio back+título+nivel de fábrica. Cuando se
+   * provee, el contador "x / y" de la esquina se oculta para no competir por espacio. */
+  headerActions?: React.ReactNode;
 }
 
 interface FlatLesson {
@@ -59,7 +64,15 @@ function lessonIcon(lesson: LessonItem): string {
  * "hero" ni gutters grandes alrededor -- AppShell en sí no se toca, así que el resto de páginas
  * (admin/docente/otras del estudiante) no se ven afectadas.
  */
-export function CourseViewer({ classroomName, programName, level, modules, backTo = "/student/salones", backLabel = "Volver a Mis salones" }: CourseViewerProps) {
+export function CourseViewer({
+  classroomName,
+  programName,
+  level,
+  modules,
+  backTo = "/student/salones",
+  backLabel = "Volver a Mis salones",
+  headerActions,
+}: CourseViewerProps) {
   const navigate = useNavigate();
   const flat = React.useMemo(() => flattenLessons(modules), [modules]);
   const [selectedLessonId, setSelectedLessonId] = React.useState<number | null>(flat[0]?.lesson.id ?? null);
@@ -116,17 +129,18 @@ export function CourseViewer({ classroomName, programName, level, modules, backT
       <header
         style={{
           flex: "0 0 auto",
-          height: 60,
+          minHeight: 60,
           display: "flex",
+          flexWrap: headerActions ? "wrap" : "nowrap",
           alignItems: "center",
           gap: 12,
-          padding: "0 var(--space-5)",
+          padding: headerActions ? "10px var(--space-5)" : "0 var(--space-5)",
           background: "var(--surface-card)",
           borderBottom: "1px solid var(--border-subtle)",
         }}
       >
         <IconButton icon="arrow-left" label={backLabel} onClick={() => navigate(backTo)} />
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: headerActions ? "1 1 160px" : "0 1 auto" }}>
           <div
             style={{
               font: "var(--weight-bold) 16px/1.2 var(--font-display)",
@@ -142,7 +156,8 @@ export function CourseViewer({ classroomName, programName, level, modules, backT
             {programName ?? "—"} · Nivel {level}
           </div>
         </div>
-        {current && (
+        {headerActions && <div style={{ marginLeft: "auto", flex: "0 0 auto" }}>{headerActions}</div>}
+        {!headerActions && current && (
           <div
             style={{
               marginLeft: "auto",

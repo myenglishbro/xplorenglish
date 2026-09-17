@@ -14,11 +14,12 @@ type Client = SupabaseClient<Database>;
 
 /**
  * getStudentHoursPackages: `remainingMinutes` se calcula acá, en el servidor, sumando
- * `hours_movements.minutes_delta` por paquete -- el ledger es la única fuente de verdad del
- * saldo (ver DOMAIN_FUNCTIONS_API.md). `hours_packages.total_minutes` NUNCA se usa como saldo,
- * solo como el monto originalmente comprado. No se duplica ninguna lógica de FIFO/consumo: esto
- * es una suma de hechos ya registrados, no una decisión de a qué paquete cargar un consumo (eso
- * sigue siendo exclusivo de `set_student_session_billing`).
+ * `hours_movements.minutes_delta` por paquete -- dato histórico POR PAQUETE, nunca el saldo
+ * operativo del estudiante (ver getStudentTotalBalance/useStudentBalance más abajo, única fuente
+ * real). `hours_packages.total_minutes` NUNCA se usa como saldo, solo como el monto originalmente
+ * comprado. Sin FIFO: register_class/correct_class (consumo real) siempre escriben
+ * `package_id=NULL` -- por eso `remainingMinutes` casi nunca baja por clases dictadas, solo por
+ * movimientos atados explícitamente a ese paquete (refund/adjustment/expiration).
  */
 export async function getStudentHoursPackages(supabase: Client): Promise<HoursPackageItem[]> {
   const { data: packages, error: packagesError } = await supabase
@@ -54,69 +55,71 @@ export async function getStudentHoursPackages(supabase: Client): Promise<HoursPa
   }));
 }
 
-interface AttendanceHistoryRow {
-  id: number;
-  session_id: number;
-  status: Database["public"]["Enums"]["attendance_status"];
-  minutes_charged: number | null;
-  session: { scheduled_start: string; scheduled_end: string; classroom: { name: string } | null } | null;
+/**
+ * Saldo TOTAL del estudiante autenticado (todos sus salones/paquetes), la única fuente de verdad
+ * real: `SUM(hours_movements.minutes_delta)` sobre el ledger completo -- nunca una suma de
+ * `remainingMinutes` por paquete (eso es lo que causaba que el dashboard mostrara un saldo
+ * desactualizado tras registrar una clase, ya que los consumos de register_class/correct_class
+ * nacen con package_id=NULL y getStudentHoursPackages nunca los contaba). RLS
+ * `hours_movements_select_own` ya acota a las filas propias, igual criterio que el resto de este
+ * archivo.
+ */
+export async function getStudentTotalBalance(supabase: Client): Promise<number> {
+  const { data, error } = await supabase.from("hours_movements").select("minutes_delta");
+  if (error) throw error;
+  return data.reduce((sum, row) => sum + row.minutes_delta, 0);
 }
 
-/** session_attendance.session_id -> sessions(id) -> sessions.classroom_id -> classrooms(id) son
- * dos FK directas encadenadas (no el caso de dos saltos vía teacher_profiles) -- el embed anidado
- * es válido, mismo patrón ya usado en dashboard/queries.ts para scheduled_teacher/actual_teacher. */
-export async function getStudentAttendanceHistory(supabase: Client): Promise<StudentAttendanceHistoryItem[]> {
+interface AttendanceHistoryRow {
+  id: number;
+  occurred_at: string;
+  status: Database["public"]["Enums"]["class_record_status"];
+  minutes: number;
+  classroom: { name: string } | null;
+}
+
+/** Fuente única class_records (Slice A/F) -- reemplaza session_attendance/sessions. Filtra por
+ * student_id explícito (RLS class_records_select ya lo acota igual, pero el filtro evita traer de
+ * más si el caller alguna vez deja de ser exclusivamente "mis propias clases"). */
+export async function getStudentAttendanceHistory(supabase: Client, studentId: string): Promise<StudentAttendanceHistoryItem[]> {
   const { data, error } = await supabase
-    .from("session_attendance")
-    .select(
-      `
-      id, session_id, status, minutes_charged,
-      session:sessions(scheduled_start, scheduled_end, classroom:classrooms(name))
-    `
-    )
+    .from("class_records")
+    .select("id, occurred_at, status, minutes, classroom:classrooms(name)")
+    .eq("student_id", studentId)
+    .order("occurred_at", { ascending: false })
     .returns<AttendanceHistoryRow[]>();
 
   if (error) throw error;
 
-  return data
-    .filter((row): row is AttendanceHistoryRow & { session: NonNullable<AttendanceHistoryRow["session"]> } => row.session !== null)
-    .map((row) => ({
-      attendanceId: row.id,
-      sessionId: row.session_id,
-      classroomName: row.session.classroom?.name ?? "Salón sin nombre",
-      scheduledStart: row.session.scheduled_start,
-      scheduledEnd: row.session.scheduled_end,
-      status: row.status,
-      minutesCharged: row.minutes_charged,
-    }))
-    .sort((a, b) => new Date(b.scheduledStart).getTime() - new Date(a.scheduledStart).getTime());
+  return data.map((row) => ({
+    classRecordId: row.id,
+    classroomName: row.classroom?.name ?? "Salón sin nombre",
+    occurredAt: row.occurred_at,
+    status: row.status,
+    minutes: row.minutes,
+  }));
 }
 
 /**
  * Pura, sin acceso a datos -- separada de getStudentHoursSummary para que una página que ya
- * cargó los paquetes (ej. para la tabla "Mis paquetes") pueda derivar el resumen sin pagar una
- * segunda vuelta idéntica a hours_packages/hours_movements. Ninguna lógica de FIFO/consumo acá,
- * solo agregación de lo que getStudentHoursPackages ya calculó.
+ * cargó los paquetes y el saldo (ej. para la tabla "Mis paquetes") pueda derivar el resumen sin
+ * pagar una segunda vuelta idéntica. `availableMinutes` SIEMPRE viene de afuera (el saldo real del
+ * ledger, ver getStudentTotalBalance) -- esta función nunca lo recalcula sumando paquetes, para que
+ * no puedan existir dos cálculos de saldo divergentes en la app.
  */
-export function summarizeHoursPackages(packages: HoursPackageItem[]): StudentHoursSummary {
-  const activePackages = packages.filter((p) => p.status === "active");
-
+export function summarizeHoursPackages(packages: HoursPackageItem[], availableMinutes: number): StudentHoursSummary {
   return {
-    // Math.max(...,0) es un guardado puramente de presentación (un paquete 'active' con saldo <=0
-    // sería una anomalía de datos, no algo que esta pantalla de solo lectura deba decidir o
-    // corregir) -- nunca escribe ni ajusta nada.
-    availableMinutes: activePackages.reduce((sum, p) => sum + Math.max(p.remainingMinutes, 0), 0),
-    activePackages: activePackages.length,
+    availableMinutes,
+    activePackages: packages.filter((p) => p.status === "active").length,
     exhaustedPackages: packages.filter((p) => p.status === "exhausted").length,
     expiredPackages: packages.filter((p) => p.status === "expired").length,
   };
 }
 
-/** Reutiliza getStudentHoursPackages en vez de volver a sumar el ledger por su cuenta -- una sola
- * implementación de "sumar hours_movements", nunca dos copias que puedan divergir. Pensada para
- * un caller que necesita SOLO el resumen (ej. un futuro widget); la página /student/horas usa
- * summarizeHoursPackages directamente sobre los paquetes que ya cargó, para no duplicar la query. */
+/** Combina paquetes (para los conteos) + saldo real del ledger (para availableMinutes) en un solo
+ * resumen -- pensado para un caller que necesita SOLO el resumen sin manejar ambas queries por su
+ * cuenta. */
 export async function getStudentHoursSummary(supabase: Client): Promise<StudentHoursSummary> {
-  const packages = await getStudentHoursPackages(supabase);
-  return summarizeHoursPackages(packages);
+  const [packages, availableMinutes] = await Promise.all([getStudentHoursPackages(supabase), getStudentTotalBalance(supabase)]);
+  return summarizeHoursPackages(packages, availableMinutes);
 }

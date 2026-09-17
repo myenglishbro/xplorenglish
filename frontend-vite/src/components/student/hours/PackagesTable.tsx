@@ -1,25 +1,21 @@
 "use client";
 
 import { DataTable, type DataTableColumn } from "@/components/ui/surfaces/DataTable";
-import { Tag, type TagTone } from "@/components/ui/core/Tag";
+import { Tag } from "@/components/ui/core/Tag";
 import { formatMinutesAsHours } from "@/lib/format/minutes";
 import { formatShortDateInLima } from "@/lib/datetime/lima";
-import type { HoursPackageItem, PackageStatus } from "@/server/hours/types";
+import { PACKAGE_STATUS_LABEL, PACKAGE_STATUS_TONE, type HoursPackageItem } from "@/server/hours/types";
 
-const STATUS_LABEL: Record<PackageStatus, string> = {
-  active: "Activo",
-  exhausted: "Agotado",
-  expired: "Vencido",
-};
-
-const STATUS_TONE: Record<PackageStatus, TagTone> = {
-  active: "success",
-  exhausted: "neutral",
-  expired: "danger",
-};
-
-/** 100% solo lectura -- remainingMinutes ya viene calculado desde el ledger en el servidor
- * (getStudentHoursPackages), este componente solo formatea y muestra. */
+/**
+ * 100% solo lectura -- remainingMinutes ya viene calculado desde el ledger en el servidor
+ * (getStudentHoursPackages), este componente solo formatea y muestra.
+ *
+ * Auditoría Slice I: la columna NUNCA se llama "Saldo" -- remainingMinutes es un dato histórico
+ * por PAQUETE (ajustado solo por refund/adjustment/expiration atados a ese package_id), no el saldo
+ * operativo del estudiante. El consumo real de register_class/correct_class nace con
+ * package_id=NULL, así que este número casi nunca baja por clases dictadas -- mostrarlo como
+ * "Saldo" confundiría con el número real (useStudentBalance, ledger completo).
+ */
 export function PackagesTable({ packages }: { packages: HoursPackageItem[] }) {
   const columns: DataTableColumn<HoursPackageItem>[] = [
     {
@@ -32,15 +28,15 @@ export function PackagesTable({ packages }: { packages: HoursPackageItem[] }) {
       ),
     },
     { key: "totalMinutes", header: "Comprado", render: (row) => formatMinutesAsHours(row.totalMinutes) },
-    { key: "remainingMinutes", header: "Saldo", render: (row) => formatMinutesAsHours(row.remainingMinutes) },
+    { key: "remainingMinutes", header: "Restante del paquete", render: (row) => formatMinutesAsHours(row.remainingMinutes) },
     { key: "purchasedAt", header: "Comprado el", render: (row) => formatShortDateInLima(row.purchasedAt) },
     { key: "expiresAt", header: "Vence", render: (row) => (row.expiresAt ? formatShortDateInLima(row.expiresAt) : "—") },
     {
       key: "status",
       header: "Estado",
       render: (row) => (
-        <Tag tone={STATUS_TONE[row.status]} size="sm">
-          {STATUS_LABEL[row.status]}
+        <Tag tone={PACKAGE_STATUS_TONE[row.status]} size="sm">
+          {PACKAGE_STATUS_LABEL[row.status]}
         </Tag>
       ),
     },

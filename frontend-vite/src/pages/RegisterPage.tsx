@@ -300,7 +300,7 @@ export function RegisterPage() {
                     <Field label="Apellidos" required htmlFor="last_name" error={fieldErrors.last_name}>
                       <Input id="last_name" name="last_name" disabled={mutation.isPending} />
                     </Field>
-                    <Field label="DNI" required htmlFor="dni" error={fieldErrors.dni}>
+                    <Field label="DNI/ID" required htmlFor="dni" error={fieldErrors.dni}>
                       <Input id="dni" name="dni" disabled={mutation.isPending} />
                     </Field>
                     <Field label="Teléfono" required htmlFor="phone" error={fieldErrors.phone}>

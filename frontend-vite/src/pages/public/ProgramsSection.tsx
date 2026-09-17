@@ -174,7 +174,7 @@ const PROGRAMS: Program[] = [
     category: "profesional",
     image: PROGRAM_IMAGES.coaching,
     description:
-      "Inglés aplicado a reuniones, presentaciones, correos y situaciones propias de tu entorno profesional.",
+      "Asesorías personalizadas",
   },
   {
     icon: "certificate",

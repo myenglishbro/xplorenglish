@@ -5,12 +5,14 @@ import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 // AppShell tanto para resaltar el activo como para navegar -- deben coincidir exactamente con
 // las rutas declaradas en app/router.tsx.
 
-/** "Políticas y reglamentos" + "Ayuda y soporte" -- navegación secundaria/institucional, igual
- * para los 3 roles (`section` los separa visualmente del resto sin tocar SidebarNav). "Ayuda y
- * soporte" es un `href` externo (WhatsApp, ver lib/support.ts) -- nunca navega dentro de la app. */
-function institutionalNavItems(policiesRoute: string): SidebarNavItem[] {
+/** "Políticas y reglamentos" (+ opcionalmente "Lineamientos docentes"/"Test de nivel", según rol) +
+ * "Ayuda y soporte" -- navegación secundaria/institucional (`section` los separa visualmente del
+ * resto sin tocar SidebarNav). "Ayuda y soporte" es un `href` externo (WhatsApp, ver lib/support.ts)
+ * -- nunca navega dentro de la app. */
+function institutionalNavItems(policiesRoute: string, extraItems: SidebarNavItem[] = []): SidebarNavItem[] {
   return [
     { value: policiesRoute, label: "Políticas y reglamentos", icon: "file-text", section: "Institucional" },
+    ...extraItems,
     { value: "support-whatsapp", label: "Ayuda y soporte", icon: "whatsapp-logo", href: SUPPORT_WHATSAPP_URL },
   ];
 }
@@ -27,7 +29,10 @@ export const ADMIN_NAV_ITEMS: SidebarNavItem[] = [
   { value: "/admin/reportes", label: "Reportes", icon: "chart-line-up" },
   { value: "/admin/configuracion", label: "Configuración", icon: "gear" },
   { value: "/admin/auditoria", label: "Auditoría", icon: "clock-counter-clockwise" },
-  ...institutionalNavItems("/admin/politicas"),
+  ...institutionalNavItems("/admin/politicas", [
+    { value: "/admin/lineamientos-docentes", label: "Lineamientos docentes", icon: "file-text", section: "Institucional" },
+    { value: "/admin/test-de-nivel", label: "Test de nivel", icon: "clipboard-text", section: "Institucional" },
+  ]),
 ];
 
 export const TEACHER_NAV_ITEMS: SidebarNavItem[] = [
@@ -36,7 +41,9 @@ export const TEACHER_NAV_ITEMS: SidebarNavItem[] = [
   { value: "/teacher/disponibilidad", label: "Mi disponibilidad", icon: "calendar-check" },
   { value: "/teacher/pagos", label: "Mis pagos", icon: "credit-card" },
   { value: "/teacher/perfil", label: "Mi perfil", icon: "user-circle" },
-  ...institutionalNavItems("/teacher/politicas"),
+  ...institutionalNavItems("/teacher/politicas", [
+    { value: "/teacher/lineamientos-docentes", label: "Lineamientos docentes", icon: "file-text", section: "Institucional" },
+  ]),
 ];
 
 export const STUDENT_NAV_ITEMS: SidebarNavItem[] = [

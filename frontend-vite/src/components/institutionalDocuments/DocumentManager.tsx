@@ -10,18 +10,31 @@ import {
   useReorderInstitutionalDocument,
 } from "@/features/institutionalDocuments/hooks";
 import { DocumentFormButton } from "./DocumentFormButton";
-import type { InstitutionalDocumentItem } from "@/server/institutionalDocuments/types";
+import type { InstitutionalDocumentItem, InstitutionalDocumentType } from "@/server/institutionalDocuments/types";
 
 /**
- * Gestión Admin de "Políticas y reglamentos" (agregar/editar/publicar/ordenar/eliminar) -- lista
+ * Gestión Admin de documentos institucionales (agregar/editar/publicar/ordenar/eliminar) -- lista
  * simple de filas, mismo patrón visual que WeeklyScheduleList (admin/scheduling). Sin
  * drag-and-drop: reordenar es un swap de sort_order con el vecino inmediato (flechas ↑/↓).
+ * Reutilizado por Políticas, Lineamientos docentes y Test de nivel (documentType).
  */
-export function DocumentManager({ items, onView }: { items: InstitutionalDocumentItem[]; onView: (doc: InstitutionalDocumentItem) => void }) {
+export function DocumentManager({
+  items,
+  documentType,
+  onView,
+  emptyStateLabel = "Sin documentos todavía",
+  addLabel = "+ Agregar documento",
+}: {
+  items: InstitutionalDocumentItem[];
+  documentType: InstitutionalDocumentType;
+  onView: (doc: InstitutionalDocumentItem) => void;
+  emptyStateLabel?: string;
+  addLabel?: string;
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
       {items.length === 0 ? (
-        <EmptyState icon="file-text" title="Sin documentos todavía">
+        <EmptyState icon="file-text" title={emptyStateLabel}>
           Agrega el primero abajo.
         </EmptyState>
       ) : (
@@ -30,6 +43,7 @@ export function DocumentManager({ items, onView }: { items: InstitutionalDocumen
             <DocumentManagerRow
               key={doc.id}
               document={doc}
+              documentType={documentType}
               onView={() => onView(doc)}
               previous={index > 0 ? items[index - 1] : undefined}
               next={index < items.length - 1 ? items[index + 1] : undefined}
@@ -39,7 +53,7 @@ export function DocumentManager({ items, onView }: { items: InstitutionalDocumen
       )}
 
       <div>
-        <DocumentFormButton mode="create" triggerLabel="+ Agregar documento" triggerVariant="secondary" triggerIcon="plus" />
+        <DocumentFormButton mode="create" documentType={documentType} triggerLabel={addLabel} triggerVariant="secondary" triggerIcon="plus" />
       </div>
     </div>
   );
@@ -47,18 +61,20 @@ export function DocumentManager({ items, onView }: { items: InstitutionalDocumen
 
 function DocumentManagerRow({
   document,
+  documentType,
   onView,
   previous,
   next,
 }: {
   document: InstitutionalDocumentItem;
+  documentType: InstitutionalDocumentType;
   onView: () => void;
   previous?: InstitutionalDocumentItem;
   next?: InstitutionalDocumentItem;
 }) {
-  const setPublished = useSetInstitutionalDocumentPublished();
-  const deleteDocument = useDeleteInstitutionalDocument();
-  const reorder = useReorderInstitutionalDocument();
+  const setPublished = useSetInstitutionalDocumentPublished(documentType);
+  const deleteDocument = useDeleteInstitutionalDocument(documentType);
+  const reorder = useReorderInstitutionalDocument(documentType);
 
   async function handleTogglePublished(checked: boolean) {
     if (setPublished.isPending) return;
@@ -124,7 +140,7 @@ function DocumentManagerRow({
             onClick={() => next && reorder.mutate({ current: document, neighbor: next })}
           />
           <Switch checked={document.isPublished} onChange={(e) => handleTogglePublished(e.target.checked)} disabled={setPublished.isPending} />
-          <DocumentFormButton mode="edit" document={document} triggerLabel="Editar" triggerVariant="ghost" triggerSize="sm" />
+          <DocumentFormButton mode="edit" documentType={documentType} document={document} triggerLabel="Editar" triggerVariant="ghost" triggerSize="sm" />
           <ConfirmActionButton
             label="Eliminar"
             icon="trash"

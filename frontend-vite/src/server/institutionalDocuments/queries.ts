@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import type { InstitutionalDocumentInput } from "./validation";
-import type { InstitutionalDocumentItem } from "./types";
+import type { InstitutionalDocumentItem, InstitutionalDocumentType } from "./types";
 
 type Client = SupabaseClient<Database>;
 
@@ -9,6 +9,7 @@ interface DocumentRow {
   id: number;
   title: string;
   url: string;
+  document_type: string;
   sort_order: number;
   is_published: boolean;
   created_at: string;
@@ -20,6 +21,7 @@ function mapRow(row: DocumentRow): InstitutionalDocumentItem {
     id: row.id,
     title: row.title,
     url: row.url,
+    documentType: row.document_type as InstitutionalDocumentType,
     sortOrder: row.sort_order,
     isPublished: row.is_published,
     createdAt: row.created_at,
@@ -27,15 +29,16 @@ function mapRow(row: DocumentRow): InstitutionalDocumentItem {
   };
 }
 
-const SELECT_COLUMNS = "id, title, url, sort_order, is_published, created_at, updated_at";
+const SELECT_COLUMNS = "id, title, url, document_type, sort_order, is_published, created_at, updated_at";
 
-/** Student/Teacher -- RLS (institutional_documents_select) ya acota a is_published=true, el
- * .eq acá es solo una optimización de consulta, no la autoridad real (mismo criterio que
- * server/student/classrooms/queries.ts). */
-export async function getPublishedInstitutionalDocuments(supabase: Client): Promise<InstitutionalDocumentItem[]> {
+/** Student/Teacher -- RLS (institutional_documents_select_*) ya acota por is_published y rol según
+ * document_type, el .eq acá es solo una optimización de consulta, no la autoridad real (mismo
+ * criterio que server/student/classrooms/queries.ts). */
+export async function getPublishedInstitutionalDocuments(supabase: Client, documentType: InstitutionalDocumentType): Promise<InstitutionalDocumentItem[]> {
   const { data, error } = await supabase
     .from("institutional_documents")
     .select(SELECT_COLUMNS)
+    .eq("document_type", documentType)
     .eq("is_published", true)
     .order("sort_order", { ascending: true })
     .returns<DocumentRow[]>();
@@ -45,10 +48,11 @@ export async function getPublishedInstitutionalDocuments(supabase: Client): Prom
 }
 
 /** Admin -- ve publicados y sin publicar (institutional_documents_admin_write ya lo permite). */
-export async function listInstitutionalDocumentsForAdmin(supabase: Client): Promise<InstitutionalDocumentItem[]> {
+export async function listInstitutionalDocumentsForAdmin(supabase: Client, documentType: InstitutionalDocumentType): Promise<InstitutionalDocumentItem[]> {
   const { data, error } = await supabase
     .from("institutional_documents")
     .select(SELECT_COLUMNS)
+    .eq("document_type", documentType)
     .order("sort_order", { ascending: true })
     .returns<DocumentRow[]>();
 
@@ -56,11 +60,13 @@ export async function listInstitutionalDocumentsForAdmin(supabase: Client): Prom
   return data.map(mapRow);
 }
 
-/** Nuevo documento al final del orden actual -- evita que Admin tenga que fijar sort_order a mano. */
-export async function createInstitutionalDocument(supabase: Client, input: InstitutionalDocumentInput): Promise<void> {
+/** Nuevo documento al final del orden actual DENTRO de su document_type -- evita que Admin tenga
+ * que fijar sort_order a mano. */
+export async function createInstitutionalDocument(supabase: Client, documentType: InstitutionalDocumentType, input: InstitutionalDocumentInput): Promise<void> {
   const { data: last } = await supabase
     .from("institutional_documents")
     .select("sort_order")
+    .eq("document_type", documentType)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -68,6 +74,7 @@ export async function createInstitutionalDocument(supabase: Client, input: Insti
   const { error } = await supabase.from("institutional_documents").insert({
     title: input.title,
     url: input.url,
+    document_type: documentType,
     is_published: input.isPublished,
     sort_order: last ? last.sort_order + 1 : 0,
   });
@@ -96,7 +103,7 @@ export async function deleteInstitutionalDocument(supabase: Client, id: number):
 }
 
 /** Swap simple de sort_order entre dos documentos (mover arriba/abajo) -- sin drag-and-drop ni
- * reordenamiento masivo, suficiente para el volumen esperado (unos pocos documentos). */
+ * reordenamiento masivo, suficiente para el volumen esperado (unos pocos documentos por tipo). */
 export async function swapInstitutionalDocumentOrder(
   supabase: Client,
   a: { id: number; sortOrder: number },

@@ -11,21 +11,22 @@ import {
   swapInstitutionalDocumentOrder,
 } from "@/server/institutionalDocuments/queries";
 import { institutionalDocumentSchema, type InstitutionalDocumentInput } from "@/server/institutionalDocuments/validation";
-import type { InstitutionalDocumentItem } from "@/server/institutionalDocuments/types";
+import type { InstitutionalDocumentItem, InstitutionalDocumentType } from "@/server/institutionalDocuments/types";
 
-/** Teacher/Student -- "Políticas y reglamentos", solo documentos publicados. */
-export function useInstitutionalDocuments() {
+/** Teacher/Student -- solo documentos publicados del documentType pedido (Políticas, Lineamientos
+ * docentes o Test de nivel comparten esta misma tabla, ver server/institutionalDocuments). */
+export function useInstitutionalDocuments(documentType: InstitutionalDocumentType) {
   return useQuery({
-    queryKey: queryKeys.institutionalDocuments(),
-    queryFn: () => getPublishedInstitutionalDocuments(supabase),
+    queryKey: queryKeys.institutionalDocuments(documentType),
+    queryFn: () => getPublishedInstitutionalDocuments(supabase, documentType),
   });
 }
 
-/** Admin -- gestión completa, incluye sin publicar. */
-export function useAdminInstitutionalDocuments() {
+/** Admin -- gestión completa del documentType pedido, incluye sin publicar. */
+export function useAdminInstitutionalDocuments(documentType: InstitutionalDocumentType) {
   return useQuery({
-    queryKey: queryKeys.institutionalDocumentsAdmin(),
-    queryFn: () => listInstitutionalDocumentsForAdmin(supabase),
+    queryKey: queryKeys.institutionalDocumentsAdmin(documentType),
+    queryFn: () => listInstitutionalDocumentsForAdmin(supabase, documentType),
   });
 }
 
@@ -44,49 +45,50 @@ function parseInput(input: InstitutionalDocumentInput) {
   return parsed.data;
 }
 
-/** Ambas queries (Admin y Teacher/Student) dependen de la misma tabla -- toda mutación invalida
- * las dos, para que un documento recién publicado/editado se vea sin recargar en cualquier rol. */
-function invalidateInstitutionalDocuments(queryClient: ReturnType<typeof useQueryClient>) {
-  queryClient.invalidateQueries({ queryKey: queryKeys.institutionalDocuments() });
-  queryClient.invalidateQueries({ queryKey: queryKeys.institutionalDocumentsAdmin() });
+/** Ambas queries (Admin y Teacher/Student) del mismo documentType dependen de la misma tabla -- toda
+ * mutación invalida las dos, para que un documento recién publicado/editado se vea sin recargar en
+ * cualquier rol. */
+function invalidateInstitutionalDocuments(queryClient: ReturnType<typeof useQueryClient>, documentType: InstitutionalDocumentType) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.institutionalDocuments(documentType) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.institutionalDocumentsAdmin(documentType) });
 }
 
-export function useCreateInstitutionalDocument() {
+export function useCreateInstitutionalDocument(documentType: InstitutionalDocumentType) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: InstitutionalDocumentInput) => createInstitutionalDocument(supabase, parseInput(input)),
-    onSuccess: () => invalidateInstitutionalDocuments(queryClient),
+    mutationFn: (input: InstitutionalDocumentInput) => createInstitutionalDocument(supabase, documentType, parseInput(input)),
+    onSuccess: () => invalidateInstitutionalDocuments(queryClient, documentType),
   });
 }
 
-export function useUpdateInstitutionalDocument(id: number) {
+export function useUpdateInstitutionalDocument(id: number, documentType: InstitutionalDocumentType) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: InstitutionalDocumentInput) => updateInstitutionalDocument(supabase, id, parseInput(input)),
-    onSuccess: () => invalidateInstitutionalDocuments(queryClient),
+    onSuccess: () => invalidateInstitutionalDocuments(queryClient, documentType),
   });
 }
 
-export function useSetInstitutionalDocumentPublished() {
+export function useSetInstitutionalDocumentPublished(documentType: InstitutionalDocumentType) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, isPublished }: { id: number; isPublished: boolean }) => setInstitutionalDocumentPublished(supabase, id, isPublished),
-    onSuccess: () => invalidateInstitutionalDocuments(queryClient),
+    onSuccess: () => invalidateInstitutionalDocuments(queryClient, documentType),
   });
 }
 
-export function useDeleteInstitutionalDocument() {
+export function useDeleteInstitutionalDocument(documentType: InstitutionalDocumentType) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => deleteInstitutionalDocument(supabase, id),
-    onSuccess: () => invalidateInstitutionalDocuments(queryClient),
+    onSuccess: () => invalidateInstitutionalDocuments(queryClient, documentType),
   });
 }
 
 /** Mover arriba/abajo -- swap de sort_order con el vecino inmediato en la lista YA CARGADA por el
  * caller (sin volver a pedir el orden actual: evita una condición de carrera trivial entre leer y
  * escribir). Sin drag-and-drop: solo flechas ↑/↓. */
-export function useReorderInstitutionalDocument() {
+export function useReorderInstitutionalDocument(documentType: InstitutionalDocumentType) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ current, neighbor }: { current: InstitutionalDocumentItem; neighbor: InstitutionalDocumentItem }) =>
@@ -95,6 +97,6 @@ export function useReorderInstitutionalDocument() {
         { id: current.id, sortOrder: current.sortOrder },
         { id: neighbor.id, sortOrder: neighbor.sortOrder },
       ),
-    onSuccess: () => invalidateInstitutionalDocuments(queryClient),
+    onSuccess: () => invalidateInstitutionalDocuments(queryClient, documentType),
   });
 }

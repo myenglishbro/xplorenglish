@@ -19,14 +19,21 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 
-// Allowlist explícita -- NUNCA "*". FRONTEND_VITE_ORIGIN cubre producción (configurable vía
-// `supabase secrets set`, sin redeploy); los dos puertos de Vite en dev (5173 default, 5174 si
-// 5173 ya está ocupado -- Vite incrementa el puerto automáticamente) están fijos en código porque
-// son puertos de desarrollador local, no un secreto de producción. Un origin fuera de esta lista
-// nunca recibe `Access-Control-Allow-Origin` en la respuesta (ver corsHeaders) -- el navegador
-// bloquea la respuesta del lado del cliente sin que haga falta rechazarlo explícitamente acá.
+// Allowlist explícita -- NUNCA "*". Bug real en producción (2026-09-17): el dominio final
+// (xplorenglish.com, con y sin "www") nunca se agregó acá -- solo quedaba la URL vieja de Vercel
+// (fallback de FRONTEND_VITE_ORIGIN, que tampoco estaba configurado como secret) y los puertos de
+// Vite en dev. Cualquier request real desde el panel Admin en producción fallaba el preflight con
+// "Failed to fetch" / CORS, sin importar que el JWT y el body fueran correctos. FRONTEND_VITE_ORIGIN
+// se mantiene como override opcional (ej. un dominio adicional futuro sin necesidad de redeploy);
+// los dominios de producción confirmados quedan fijos en código, igual criterio que los puertos de
+// Vite en dev. Un origin fuera de esta lista nunca recibe `Access-Control-Allow-Origin` en la
+// respuesta (ver corsHeaders) -- el navegador bloquea la respuesta del lado del cliente sin que
+// haga falta rechazarlo explícitamente acá.
+const PRODUCTION_ORIGINS = ["https://xplorenglish.com", "https://www.xplorenglish.com"];
 const ALLOWED_ORIGINS = new Set(
-  [Deno.env.get("FRONTEND_VITE_ORIGIN") ?? "https://xplore-english.vercel.app", "http://localhost:5173", "http://localhost:5174"]
+  [...PRODUCTION_ORIGINS, Deno.env.get("FRONTEND_VITE_ORIGIN"), "http://localhost:5173", "http://localhost:5174"].filter(
+    (origin): origin is string => !!origin
+  )
 );
 
 // Lista canónica de @supabase/supabase-js/cors (SUPABASE_HEADERS) -- el cliente agrega

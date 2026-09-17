@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/forms/Input";
 import { Switch } from "@/components/ui/forms/Switch";
 import { Alert } from "@/components/ui/feedback/Alert";
 import { useCreateInstitutionalDocument, useUpdateInstitutionalDocument, type InstitutionalDocumentFieldErrors } from "@/features/institutionalDocuments/hooks";
-import type { InstitutionalDocumentItem } from "@/server/institutionalDocuments/types";
+import type { InstitutionalDocumentItem, InstitutionalDocumentType } from "@/server/institutionalDocuments/types";
 
 export interface DocumentFormButtonProps {
   mode: "create" | "edit";
+  documentType: InstitutionalDocumentType;
   /** Requerido en mode="edit" (prellena el formulario); ignorado en mode="create". */
   document?: InstitutionalDocumentItem;
   triggerLabel: string;
@@ -20,7 +21,7 @@ export interface DocumentFormButtonProps {
 
 /** Alta/edición de un documento institucional -- título + URL + publicado. Sin editor rich text,
  * sin categorías: exactamente el modelo mínimo pedido (institutional_documents). */
-export function DocumentFormButton({ mode, document, triggerLabel, triggerVariant = "secondary", triggerSize = "md", triggerIcon }: DocumentFormButtonProps) {
+export function DocumentFormButton({ mode, documentType, document, triggerLabel, triggerVariant = "secondary", triggerSize = "md", triggerIcon }: DocumentFormButtonProps) {
   const formId = React.useId();
   const [open, setOpen] = React.useState(false);
   const [title, setTitle] = React.useState(document?.title ?? "");
@@ -28,8 +29,8 @@ export function DocumentFormButton({ mode, document, triggerLabel, triggerVarian
   const [isPublished, setIsPublished] = React.useState(document?.isPublished ?? false);
   const [fieldErrors, setFieldErrors] = React.useState<InstitutionalDocumentFieldErrors>({});
 
-  const createDocument = useCreateInstitutionalDocument();
-  const updateDocument = useUpdateInstitutionalDocument(document?.id ?? -1);
+  const createDocument = useCreateInstitutionalDocument(documentType);
+  const updateDocument = useUpdateInstitutionalDocument(document?.id ?? -1, documentType);
   const mutation = mode === "create" ? createDocument : updateDocument;
 
   function handleOpen() {

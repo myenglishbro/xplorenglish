@@ -468,6 +468,7 @@ export type Database = {
       institutional_documents: {
         Row: {
           created_at: string
+          document_type: string
           id: number
           is_published: boolean
           sort_order: number
@@ -477,6 +478,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          document_type?: string
           id?: never
           is_published?: boolean
           sort_order?: number
@@ -486,6 +488,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          document_type?: string
           id?: never
           is_published?: boolean
           sort_order?: number

@@ -9,6 +9,8 @@ import { AdminLayout } from "@/layouts/AdminLayout";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
 import { SalonDetailPage } from "@/pages/SalonDetailPage";
 import { PoliciesPage } from "@/pages/PoliciesPage";
+import { TeacherGuidelinesPage } from "@/pages/TeacherGuidelinesPage";
+import { LevelTestPage } from "@/pages/LevelTestPage";
 import { AuditLogPage } from "@/pages/admin/AuditLogPage";
 
 import { DashboardPage } from "@/pages/admin/DashboardPage";
@@ -40,7 +42,6 @@ import { StudentHomePage } from "@/pages/student/StudentHomePage";
 import { StudentSalonesPage } from "@/pages/student/SalonesPage";
 import { StudentHorasPage } from "@/pages/student/HorasPage";
 import { StudentPerfilPage } from "@/pages/student/PerfilPage";
-import { StudentTestDeNivelPage } from "@/pages/student/TestDeNivelPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
       { path: "pagos", element: <TeacherPagosPage /> },
       { path: "perfil", element: <TeacherPerfilPage /> },
       { path: "politicas", element: <PoliciesPage /> },
+      { path: "lineamientos-docentes", element: <TeacherGuidelinesPage /> },
     ],
   },
   {
@@ -76,7 +78,7 @@ export const router = createBrowserRouter([
       { path: "salones/:id", element: <SalonDetailPage role="student" /> },
       { path: "horas", element: <StudentHorasPage /> },
       { path: "perfil", element: <StudentPerfilPage /> },
-      { path: "test-de-nivel", element: <StudentTestDeNivelPage /> },
+      { path: "test-de-nivel", element: <LevelTestPage /> },
       { path: "politicas", element: <PoliciesPage /> },
     ],
   },
@@ -108,6 +110,8 @@ export const router = createBrowserRouter([
       { path: "configuracion", element: <ConfiguracionPage /> },
       { path: "auditoria", element: <AuditLogPage /> },
       { path: "politicas", element: <PoliciesPage /> },
+      { path: "lineamientos-docentes", element: <TeacherGuidelinesPage /> },
+      { path: "test-de-nivel", element: <LevelTestPage /> },
     ],
   },
   { path: "/", element: <LandingPage /> },

@@ -32,9 +32,9 @@ const PACKAGES: PricingPackage[] = [
     name: "Pack 40",
     hours: 40,
     regularPrice: 1800,
-    price: 1300,
-    savings: 500,
-    discount: "28% OFF",
+    price: 1250,
+    savings: 550,
+    discount: "31% OFF",
   },
   {
     name: "Programa 60",

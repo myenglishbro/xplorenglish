@@ -15,11 +15,15 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// Allowlist explícita -- NUNCA "*". Mismo criterio que admin-create-student (ver ese archivo para
-// el razonamiento completo): FRONTEND_VITE_ORIGIN cubre producción (configurable vía
-// `supabase secrets set`, sin redeploy); los dos puertos de Vite en dev están fijos en código.
+// Allowlist explícita -- NUNCA "*". Mismo fix que admin-create-student (ver ese archivo para el
+// razonamiento completo): el dominio final (xplorenglish.com, con y sin "www") nunca estaba en la
+// lista -- bug real en producción (2026-09-17). FRONTEND_VITE_ORIGIN se mantiene como override
+// opcional; los dominios de producción confirmados quedan fijos en código.
+const PRODUCTION_ORIGINS = ["https://xplorenglish.com", "https://www.xplorenglish.com"];
 const ALLOWED_ORIGINS = new Set(
-  [Deno.env.get("FRONTEND_VITE_ORIGIN") ?? "https://xplore-english.vercel.app", "http://localhost:5173", "http://localhost:5174"]
+  [...PRODUCTION_ORIGINS, Deno.env.get("FRONTEND_VITE_ORIGIN"), "http://localhost:5173", "http://localhost:5174"].filter(
+    (origin): origin is string => !!origin
+  )
 );
 
 // Lista canónica de @supabase/supabase-js/cors (SUPABASE_HEADERS) -- ver admin-create-student

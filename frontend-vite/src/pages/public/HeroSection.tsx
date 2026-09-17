@@ -387,7 +387,7 @@ export function HeroSection() {
                   motion-reduce:transform-none
                 "
               >
-                Agenda tu clase diagnóstica
+                Agenda tu clase Hoy!
 
                 <span
                   className="

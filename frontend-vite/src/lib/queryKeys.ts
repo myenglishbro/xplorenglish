@@ -1,3 +1,5 @@
+import type { InstitutionalDocumentType } from "@/server/institutionalDocuments/types";
+
 /** Query keys coherentes por dominio -- un solo lugar para que lecturas y las invalidaciones de
  * sus mutaciones nunca diverjan. Todas incluyen el id del usuario actual cuando aplica, para que
  * el cache nunca mezcle datos de una sesión anterior (ej. logout + login con otra cuenta). */
@@ -48,10 +50,12 @@ export const queryKeys = {
    * admin en ese momento; ver features/expensesAdmin/hooks.ts. */
   adminFinancialReport: (startDate: string, endDate: string) => ["admin-financial-report", startDate, endDate] as const,
   adminFinancialTrend: (monthsBack: number) => ["admin-financial-trend", monthsBack] as const,
-  /** Documentos institucionales globales (políticas/reglamentos) -- dos claves separadas porque
+  /** Documentos institucionales globales (políticas/lineamientos docentes/test de nivel, ver
+   * server/institutionalDocuments) -- separadas por documentType porque cada sección (Políticas,
+   * Lineamientos docentes, Test de nivel) es una lista independiente, y dos claves por tipo porque
    * Admin ve publicados+sin publicar (institutionalDocumentsAdmin) y Teacher/Student solo
-   * publicados (institutionalDocuments); una mutación admin invalida ambas. */
-  institutionalDocuments: () => ["institutional-documents"] as const,
-  institutionalDocumentsAdmin: () => ["institutional-documents-admin"] as const,
+   * publicados (institutionalDocuments); una mutación admin invalida ambas para su tipo. */
+  institutionalDocuments: (documentType: InstitutionalDocumentType) => ["institutional-documents", documentType] as const,
+  institutionalDocumentsAdmin: (documentType: InstitutionalDocumentType) => ["institutional-documents-admin", documentType] as const,
   adminAuditLogs: () => ["admin-audit-logs"] as const,
 };

@@ -79,10 +79,10 @@ export function MethodologySection() {
               </span>
             </div>
 
-            <h2 className="mt-5 max-w-2xl text-[38px] font-bold leading-[1.04] tracking-[-.045em] text-white sm:text-[48px] lg:text-[54px]">
+            <h2 className="mt-5 max-w-2xl text-[30px] font-bold leading-[1.1] tracking-[-.04em] text-white sm:text-[38px] sm:leading-[1.04] sm:tracking-[-.045em] md:text-[48px] lg:text-[54px]">
               Una ruta diseñada
-              <br />
-              alrededor de{" "}
+              <br className="hidden sm:block" />
+              {" "}alrededor de{" "}
               <span className="relative inline-block text-[#00d5df]">
                 ti.
                 <span className="absolute -bottom-2 left-0 h-[4px] w-full rounded-full bg-[#ff7200]" />

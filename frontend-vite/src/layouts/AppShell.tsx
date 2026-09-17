@@ -4,6 +4,7 @@ import { SidebarNav, type SidebarNavItem } from "@/components/ui/navigation/Side
 import { TopBar } from "@/components/ui/navigation/TopBar";
 import { Button } from "@/components/ui/core/Button";
 import { supabase } from "@/lib/supabase";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import type { UserRole } from "@/auth/roles";
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -34,9 +35,16 @@ export function AppShell({ profile, navItems, children }: AppShellProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [loggingOut, setLoggingOut] = React.useState(false);
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
 
   const activeValue = navItems.find((item) => location.pathname === item.value)?.value;
   const fullName = `${profile.first_name} ${profile.last_name}`.trim();
+
+  // Cierra el drawer al navegar a otra ruta (selección de un item del sidebar en mobile).
+  React.useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   async function handleLogout() {
     if (loggingOut) return;
@@ -45,21 +53,57 @@ export function AppShell({ profile, navItems, children }: AppShellProps) {
     navigate("/login", { replace: true });
   }
 
+  const sidebar = (
+    <SidebarNav
+      items={navItems}
+      value={activeValue}
+      onChange={(value) => navigate(value)}
+      style={isDesktop ? undefined : { minHeight: "100vh" }}
+      footer={
+        <Button variant="ghost" icon="sign-out" fullWidth loading={loggingOut} disabled={loggingOut} onClick={handleLogout}>
+          Cerrar sesión
+        </Button>
+      }
+    />
+  );
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--surface-page)" }}>
-      <SidebarNav
-        items={navItems}
-        value={activeValue}
-        onChange={(value) => navigate(value)}
-        footer={
-          <Button variant="ghost" icon="sign-out" fullWidth loading={loggingOut} disabled={loggingOut} onClick={handleLogout}>
-            Cerrar sesión
-          </Button>
-        }
-      />
+      {isDesktop ? (
+        sidebar
+      ) : (
+        <>
+          {mobileNavOpen && (
+            <div
+              onClick={() => setMobileNavOpen(false)}
+              aria-hidden="true"
+              style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, .45)", zIndex: 40 }}
+            />
+          )}
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              zIndex: 50,
+              transform: mobileNavOpen ? "translateX(0)" : "translateX(-100%)",
+              transition: "transform var(--transition-control, .2s ease)",
+              boxShadow: mobileNavOpen ? "0 10px 40px rgba(15, 23, 42, .25)" : "none",
+            }}
+          >
+            {sidebar}
+          </div>
+        </>
+      )}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <TopBar title={fullName} subtitle={ROLE_LABEL[profile.role]} user={{ name: fullName, role: ROLE_LABEL[profile.role] }} />
-        <main style={{ flex: 1, padding: "var(--space-6)", overflowY: "auto" }}>{children}</main>
+        <TopBar
+          title={fullName}
+          subtitle={ROLE_LABEL[profile.role]}
+          user={{ name: fullName, role: ROLE_LABEL[profile.role] }}
+          onMenu={isDesktop ? undefined : () => setMobileNavOpen(true)}
+        />
+        <main style={{ flex: 1, minWidth: 0, padding: isDesktop ? "var(--space-6)" : "var(--space-4)", overflowY: "auto" }}>{children}</main>
       </div>
     </div>
   );

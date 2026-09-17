@@ -30,14 +30,14 @@ export function TopBar({ title, subtitle, children, user, notifications, onMenu,
         display: "flex",
         alignItems: "center",
         gap: 16,
-        padding: "0 24px",
+        padding: "0 clamp(12px, 4vw, 24px)",
         background: "var(--surface-card)",
         borderBottom: "1px solid var(--border-subtle)",
         ...style,
       }}
     >
       {onMenu && <IconButton icon="list" label="Menú" onClick={onMenu} />}
-      <div style={{ minWidth: 0 }}>
+      <div style={{ minWidth: 0, flex: "1 1 auto" }}>
         {title && (
           <div
             style={{
@@ -54,7 +54,7 @@ export function TopBar({ title, subtitle, children, user, notifications, onMenu,
         )}
         {subtitle && <div style={{ font: "var(--weight-regular) var(--text-caption-size)/1.3 var(--font-body)", color: "var(--text-muted)", marginTop: 2 }}>{subtitle}</div>}
       </div>
-      <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
+      <div style={{ flex: "0 0 auto", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
         {children}
         <span style={{ position: "relative", display: "inline-flex" }}>
           <IconButton icon="bell" label="Notificaciones" />

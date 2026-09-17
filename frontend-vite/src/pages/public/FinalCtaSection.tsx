@@ -36,7 +36,7 @@ export function FinalCtaSection() {
             href={WHATSAPP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex min-h-[56px] min-w-[220px] items-center justify-between gap-6 rounded-[16px] bg-white px-6 text-[14px] font-bold text-[#102f43] shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ed8e5]"
+            className="group flex min-h-[56px] w-full items-center justify-between gap-6 rounded-[16px] bg-white px-6 text-[14px] font-bold text-[#102f43] shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ed8e5] sm:w-auto sm:min-w-[220px]"
           >
             <span>Hablar con X-plore</span>
 

@@ -86,7 +86,7 @@ export function PaymentMethodsSection() {
             <span className="h-[3px] w-7 rounded-full bg-[#00d5df]" />
           </div>
 
-          <h2 className="mt-5 text-[36px] font-bold leading-[1.06] tracking-[-.04em] text-[#0b273b] sm:text-[46px]">
+          <h2 className="mt-5 text-[28px] font-bold leading-[1.1] tracking-[-.03em] text-[#0b273b] min-[375px]:text-[32px] sm:text-[46px] sm:leading-[1.06] sm:tracking-[-.04em]">
             Elige cómo realizar
             <br className="hidden sm:block" /> tu pago.
           </h2>
@@ -135,9 +135,9 @@ export function PaymentMethodsSection() {
                       />
                     </div>
 
-                    <div>
+                    <div className="min-w-0">
                       <div
-                        className={`text-[12px] font-bold ${
+                        className={`truncate text-[12px] font-bold ${
                           active ? "text-[#0b273b]" : "text-[#647984]"
                         }`}
                       >
@@ -145,7 +145,7 @@ export function PaymentMethodsSection() {
                       </div>
 
                       <div
-                        className={`mt-1 text-[9px] font-bold uppercase tracking-[.1em] ${
+                        className={`mt-1 truncate text-[9px] font-bold uppercase tracking-[.1em] ${
                           active ? "text-[#ff7200]" : "text-[#9aa9af]"
                         }`}
                       >

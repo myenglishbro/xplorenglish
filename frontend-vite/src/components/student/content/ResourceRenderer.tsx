@@ -134,6 +134,7 @@ export function ResourceRenderer({ resource }: { resource: RenderableResource })
             maxWidth: isVideo ? 760 : undefined,
             aspectRatio: isVideo ? "16 / 9" : undefined,
             height: isVideo ? undefined : "min(72vh, 780px)",
+            minHeight: isVideo ? undefined : 320,
             borderRadius: "var(--radius-lg)",
             overflow: "hidden",
             border: "1px solid var(--border-subtle)",

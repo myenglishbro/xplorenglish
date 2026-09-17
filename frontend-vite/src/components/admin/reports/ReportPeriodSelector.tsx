@@ -110,7 +110,7 @@ export function ReportPeriodSelector({ anchorDate, customRange, onChangeAnchor, 
       {showCustomForm && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", padding: "var(--space-4)", background: "var(--surface-sunken)", borderRadius: "var(--radius-lg)", maxWidth: 420 }}>
           {customError && <Alert tone="danger">{customError}</Alert>}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "var(--space-3)" }}>
             <Field label="Desde" required htmlFor="reportRangeStart">
               <Input id="reportRangeStart" type="date" value={draftStart} onChange={(e) => setDraftStart(e.target.value)} />
             </Field>

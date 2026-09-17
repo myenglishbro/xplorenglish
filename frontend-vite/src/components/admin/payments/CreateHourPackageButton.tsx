@@ -114,7 +114,7 @@ export function CreateHourPackageButton({ students, triggerLabel = "Registrar pa
           <Field label="Etiqueta del paquete" required htmlFor="packageLabel" error={fieldErrors.packageLabel} hint="Ej. '10 horas'">
             <Input id="packageLabel" value={packageLabel} onChange={(e) => setPackageLabel(e.target.value)} disabled={mutation.isPending} />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-4)" }}>
             <Field label="Minutos totales" required htmlFor="totalMinutes" error={fieldErrors.totalMinutes}>
               <Input id="totalMinutes" type="number" min={1} step={1} value={totalMinutes} onChange={(e) => setTotalMinutes(e.target.value)} disabled={mutation.isPending} />
             </Field>
@@ -122,7 +122,7 @@ export function CreateHourPackageButton({ students, triggerLabel = "Registrar pa
               <Input id="price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} disabled={mutation.isPending} />
             </Field>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-4)" }}>
             <Field label="Método de pago" required htmlFor="paymentMethod" error={fieldErrors.paymentMethod} hint="Ej. 'yape', 'transferencia'">
               <Input id="paymentMethod" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} disabled={mutation.isPending} />
             </Field>

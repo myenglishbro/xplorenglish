@@ -93,7 +93,7 @@ export function SalonDetailAdminPage() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "var(--space-5)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: "var(--space-5)" }}>
         <Card header={cardTitle("Datos del salón")}>
           <ClassroomEditForm classroom={classroom} programs={programs} />
         </Card>

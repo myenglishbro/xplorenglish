@@ -109,7 +109,7 @@ export function ClassScheduleBlockButton({
           <Field label="Día" required htmlFor="classScheduleDayOfWeek" error={fieldErrors.dayOfWeek}>
             <Select id="classScheduleDayOfWeek" value={dayOfWeek} options={DAY_OPTIONS} onChange={(e) => setDayOfWeek(e.target.value)} disabled={pending} />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "var(--space-3)" }}>
             <Field label="Hora inicio" required htmlFor="classScheduleStartTime" error={fieldErrors.startTime}>
               <Input id="classScheduleStartTime" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} disabled={pending} />
             </Field>

@@ -111,7 +111,7 @@ export function RegisterClassButton({ classroomId, disabled }: RegisterClassButt
         <form id={formId} onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           {registerClass.isError && <Alert tone="danger">{(registerClass.error as Error).message}</Alert>}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "var(--space-3)" }}>
             <Field label="Fecha" required htmlFor="registerClassDate">
               <Input id="registerClassDate" type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={registerClass.isPending} />
             </Field>

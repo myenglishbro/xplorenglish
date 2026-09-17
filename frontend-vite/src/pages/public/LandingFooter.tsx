@@ -108,8 +108,9 @@ export function LandingFooter() {
                 className="
                   h-[152px]
                   w-auto
+                  max-w-full
                   object-contain
-                 
+
                   transition-opacity
                   duration-200
                   hover:opacity-80

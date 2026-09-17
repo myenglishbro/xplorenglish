@@ -203,13 +203,16 @@ export function HeroSection() {
 
             <h1
               className="
-                text-[46px]
+                text-[34px]
                 font-bold
-                leading-[.98]
-                tracking-[-.055em]
+                leading-[1.04]
+                tracking-[-.045em]
                 text-[#102f43]
 
+                min-[375px]:text-[38px]
                 sm:text-[55px]
+                sm:leading-[.98]
+                sm:tracking-[-.055em]
                 lg:text-[60px]
                 xl:text-[66px]
               "

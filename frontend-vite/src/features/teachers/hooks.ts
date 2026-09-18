@@ -1,10 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
-import { listTeacherProfiles, getActiveClassroomCounts, toTeacherListItem } from "@/server/admin/teachers/queries";
+import {
+  listTeacherProfiles,
+  getActiveClassroomCounts,
+  getTeacherAvailabilityByIds,
+  getAllTeacherAvailabilityByIds,
+  getTeacherSkillNamesByIds,
+  toTeacherListItem,
+} from "@/server/admin/teachers/queries";
 import { updateTeacherProfileSchema, type UpdateTeacherProfileInput } from "@/server/admin/teachers/validation";
 import { listMyClassroomsAsTeacher } from "@/server/teacher/classrooms/queries";
 import type { TeacherListItem } from "@/server/admin/teachers/types";
+import type { AvailabilityBlockItem } from "@/features/availability/types";
 
 const TEACHER_EMAILS_RPC_ERROR_MESSAGES: Record<string, string> = {
   UNAUTHENTICATED: "Tu sesión expiró. Vuelve a iniciar sesión.",
@@ -55,6 +63,45 @@ export function useTeacherClassrooms(teacherId: string) {
     queryKey: ["admin-teacher-classrooms", teacherId] as const,
     queryFn: () => listMyClassroomsAsTeacher(supabase, teacherId),
     enabled: !!teacherId,
+  });
+}
+
+/**
+ * Disponibilidad + niveles (skills) registrados por el docente, para el modal read-only
+ * "Ver disponibilidad" de Admin > Docentes (Ajuste 5). Misma fuente de verdad (teacher_availability,
+ * teacher_skills vía RLS admin) que usa la recomendación de profesores al configurar un salón.
+ */
+export function useTeacherAvailabilityAndSkills(teacherId: string) {
+  return useQuery({
+    queryKey: ["admin-teacher-availability-skills", teacherId] as const,
+    queryFn: async (): Promise<{ availability: AvailabilityBlockItem[]; skillNames: string[] }> => {
+      const [availabilityByTeacher, skillsByTeacher] = await Promise.all([
+        getTeacherAvailabilityByIds(supabase, [teacherId]),
+        getTeacherSkillNamesByIds(supabase, [teacherId]),
+      ]);
+      return {
+        availability: availabilityByTeacher.get(teacherId) ?? [],
+        skillNames: skillsByTeacher.get(teacherId) ?? [],
+      };
+    },
+    enabled: !!teacherId,
+  });
+}
+
+/** Vista conjunta de Admin > Docentes: nombres de profiles y bloques de teacher_availability. */
+export function useAllTeacherAvailability() {
+  return useQuery({
+    queryKey: ["admin-all-teacher-availability"] as const,
+    queryFn: async () => {
+      const teachers = await listTeacherProfiles(supabase);
+      const availabilityByTeacher = await getAllTeacherAvailabilityByIds(supabase, teachers.map((teacher) => teacher.id));
+      return teachers.map((teacher) => ({
+        id: teacher.id,
+        name: `${teacher.firstName} ${teacher.lastName}`.trim(),
+        teacherStatus: teacher.teacherStatus,
+        availability: availabilityByTeacher.get(teacher.id) ?? [],
+      }));
+    },
   });
 }
 

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/forms/Input";
 import { Select } from "@/components/ui/forms/Select";
 import { Textarea } from "@/components/ui/forms/Textarea";
 import { Alert } from "@/components/ui/feedback/Alert";
+import { limaWallClockToUtc, toLimaDateTimeInputValues } from "@/lib/datetime/lima";
 import { useCorrectClass } from "@/features/classRecords/hooks";
 import type { ClassRecordHistoryItem, ClassRecordStatus } from "@/features/classRecords/types";
 
@@ -32,15 +33,20 @@ export function CorrectClassButton({ classroomId, record }: CorrectClassButtonPr
   const [status, setStatus] = React.useState<ClassRecordStatus>(record.status);
   const [minutes, setMinutes] = React.useState(String(record.minutes));
   const [notes, setNotes] = React.useState(record.notes ?? "");
+  const [date, setDate] = React.useState("");
+  const [time, setTime] = React.useState("");
   const [minutesError, setMinutesError] = React.useState<string | undefined>();
 
   const isPaid = record.teacherPaymentId !== null;
   const correctClass = useCorrectClass(classroomId);
 
   function handleOpen() {
+    const initial = toLimaDateTimeInputValues(record.occurredAt);
     setStatus(record.status);
     setMinutes(String(record.minutes));
     setNotes(record.notes ?? "");
+    setDate(initial.date);
+    setTime(initial.time);
     setMinutesError(undefined);
     setOpen(true);
   }
@@ -62,6 +68,7 @@ export function CorrectClassButton({ classroomId, record }: CorrectClassButtonPr
         status: isPaid ? record.status : status,
         minutes: minutesValue,
         notes: notes.trim() || null,
+        occurredAt: isPaid ? undefined : limaWallClockToUtc(date, time).toISOString(),
       });
       setOpen(false);
     } catch {
@@ -97,6 +104,27 @@ export function CorrectClassButton({ classroomId, record }: CorrectClassButtonPr
       >
         <form id={formId} onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           {correctClass.isError && <Alert tone="danger">{(correctClass.error as Error).message}</Alert>}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "var(--space-3)" }}>
+            <Field label="Fecha" required htmlFor="correctClassDate">
+              <Input
+                id="correctClassDate"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                disabled={correctClass.isPending || isPaid}
+              />
+            </Field>
+            <Field label="Hora" required htmlFor="correctClassTime">
+              <Input
+                id="correctClassTime"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                disabled={correctClass.isPending || isPaid}
+              />
+            </Field>
+          </div>
 
           <Field label="Estado" required htmlFor="correctClassStatus">
             <Select

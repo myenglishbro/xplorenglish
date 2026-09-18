@@ -111,7 +111,13 @@ export function SalonDetailAdminPage() {
           </Card>
 
           <Card header={cardTitle("Profesores habilitados")}>
-            <ClassroomTeachersPanel classroomId={classroom.id} teachers={classroom.teachers} assignableTeachers={assignableTeachers} />
+            <ClassroomTeachersPanel
+              classroomId={classroom.id}
+              teachers={classroom.teachers}
+              assignableTeachers={assignableTeachers}
+              classroomLevel={classroom.level}
+              activeSchedules={schedules.filter((s) => s.isActive)}
+            />
           </Card>
         </div>
       </div>

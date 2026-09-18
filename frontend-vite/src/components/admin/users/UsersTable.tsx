@@ -17,6 +17,30 @@ function AccessTag({ accessStatus }: { accessStatus: AccessStatus | null }) {
   );
 }
 
+function ClassroomCell({ row, navigate }: { row: UserListItem; navigate: ReturnType<typeof useNavigate> }) {
+  if (!row.classroom) return <Tag tone="neutral">Sin asignar</Tag>;
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        navigate(`/admin/salones/${row.classroom!.id}`);
+      }}
+      style={{
+        background: "none",
+        border: "none",
+        padding: 0,
+        color: "var(--text-brand)",
+        font: "var(--weight-semibold) var(--text-body-sm-size)/1.3 var(--font-body)",
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      {row.classroom.name}
+    </button>
+  );
+}
+
 function StatusCell({ row }: { row: UserListItem }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -88,6 +112,11 @@ export function UsersTable({ items, mode }: UsersTableProps) {
       key: "status",
       header: "Estado",
       render: (row) => <StatusCell row={row} />,
+    },
+    {
+      key: "classroom",
+      header: "Salón",
+      render: (row) => <ClassroomCell row={row} navigate={navigate} />,
     },
     {
       key: "accessStatus",

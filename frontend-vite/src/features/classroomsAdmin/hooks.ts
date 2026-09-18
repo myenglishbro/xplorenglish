@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
 import { listClassrooms, getClassroomDetail, listAssignableTeachers, listAssignableStudents } from "@/server/admin/classrooms/queries";
+import { getTeacherAvailabilityByIds, getTeacherSkillNamesByIds } from "@/server/admin/teachers/queries";
 import { classroomSchema, type ClassroomInput } from "@/server/admin/classrooms/validation";
 import type { ClassroomListFilters } from "@/server/admin/classrooms/types";
 
@@ -26,6 +27,25 @@ export function useAssignableTeachers() {
   return useQuery({
     queryKey: queryKeys.adminAssignableTeachers(),
     queryFn: () => listAssignableTeachers(supabase),
+  });
+}
+
+/**
+ * Disponibilidad + niveles de un lote de docentes candidatos, para priorizar (AJUSTE 1) sin
+ * bloquear: solo alimenta el ordenamiento/etiqueta del selector, RLS admin ya autoriza la lectura.
+ */
+export function useTeacherAvailabilityAndSkillsForIds(teacherIds: string[]) {
+  const sortedIds = [...teacherIds].sort();
+  return useQuery({
+    queryKey: ["admin-teachers-availability-skills", sortedIds] as const,
+    queryFn: async () => {
+      const [availabilityByTeacher, skillsByTeacher] = await Promise.all([
+        getTeacherAvailabilityByIds(supabase, sortedIds),
+        getTeacherSkillNamesByIds(supabase, sortedIds),
+      ]);
+      return { availabilityByTeacher, skillsByTeacher };
+    },
+    enabled: sortedIds.length > 0,
   });
 }
 

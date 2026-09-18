@@ -2,13 +2,19 @@ import React from "react";
 import { Select } from "@/components/ui/forms/Select";
 import { Button } from "@/components/ui/core/Button";
 import { Alert } from "@/components/ui/feedback/Alert";
-import { useAddClassroomTeacher, useRemoveClassroomTeacher } from "@/features/classroomsAdmin/hooks";
+import { useAddClassroomTeacher, useRemoveClassroomTeacher, useTeacherAvailabilityAndSkillsForIds } from "@/features/classroomsAdmin/hooks";
+import { rankTeachersForClassroom } from "@/features/classroomsAdmin/teacherRecommendation";
 import type { AssignableTeacher, TeacherMembership } from "@/server/admin/classrooms/types";
+import type { ClassScheduleItem } from "@/server/scheduling/types";
 
 export interface ClassroomTeachersPanelProps {
   classroomId: number;
   teachers: TeacherMembership[];
   assignableTeachers: AssignableTeacher[];
+  /** Nivel del salón y horario semanal activo -- usados SOLO para priorizar/anotar candidatos
+   * (AJUSTE 1). Nunca restringen: el Admin siempre puede elegir cualquier profesor activo. */
+  classroomLevel: string;
+  activeSchedules: ClassScheduleItem[];
 }
 
 /**
@@ -16,7 +22,7 @@ export interface ClassroomTeachersPanelProps {
  * profesor habilitado puede registrar clases en este salón. Quitar a un profesor solo desactiva su
  * membresía (status='inactive') -- nunca borra ni modifica sus class_records/pagos históricos.
  */
-export function ClassroomTeachersPanel({ classroomId, teachers, assignableTeachers }: ClassroomTeachersPanelProps) {
+export function ClassroomTeachersPanel({ classroomId, teachers, assignableTeachers, classroomLevel, activeSchedules }: ClassroomTeachersPanelProps) {
   const addTeacher = useAddClassroomTeacher(classroomId);
   const removeTeacher = useRemoveClassroomTeacher(classroomId);
   const pending = addTeacher.isPending || removeTeacher.isPending;
@@ -24,8 +30,20 @@ export function ClassroomTeachersPanel({ classroomId, teachers, assignableTeache
   const [selection, setSelection] = React.useState("");
 
   const enabledIds = new Set(teachers.map((t) => t.teacherId));
-  const candidates = assignableTeachers.filter((t) => !enabledIds.has(t.id));
-  const options = candidates.map((t) => ({ value: t.id, label: `${t.firstName} ${t.lastName}` }));
+  const rawCandidates = assignableTeachers.filter((t) => !enabledIds.has(t.id));
+  const recommendation = useTeacherAvailabilityAndSkillsForIds(rawCandidates.map((t) => t.id));
+
+  const candidates = rankTeachersForClassroom(
+    rawCandidates,
+    activeSchedules,
+    recommendation.data?.availabilityByTeacher ?? new Map(),
+    recommendation.data?.skillsByTeacher ?? new Map(),
+    classroomLevel
+  );
+  const options = candidates.map((t) => ({
+    value: t.id,
+    label: t.hint ? `${t.firstName} ${t.lastName} -- ${t.hint}` : `${t.firstName} ${t.lastName}`,
+  }));
 
   async function handleAdd() {
     if (!selection || pending) return;

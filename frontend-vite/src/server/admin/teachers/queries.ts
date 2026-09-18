@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
+import type { AvailabilityBlockItem } from "@/features/availability/types";
 import type { TeacherListItem, TeacherProfileStatus } from "./types";
 
 type Client = SupabaseClient<Database>;
@@ -64,6 +65,89 @@ export async function getActiveClassroomCounts(supabase: Client, teacherIds: str
     countByTeacher.set(a.teacher_id, (countByTeacher.get(a.teacher_id) ?? 0) + 1);
   }
   return countByTeacher;
+}
+
+/**
+ * Disponibilidad semanal de un lote de docentes en una sola query (RLS teacher_availability_owner
+ * ya permite lectura total a Admin, 0003 -- misma fuente de verdad que "Mi disponibilidad" del
+ * docente). Usado por Ajuste 1 (recomendación al configurar salón) y Ajuste 5 (Admin > Docentes >
+ * Ver disponibilidad, con un solo id).
+ */
+export async function getTeacherAvailabilityByIds(
+  supabase: Client,
+  teacherIds: string[]
+): Promise<Map<string, AvailabilityBlockItem[]>> {
+  const map = new Map<string, AvailabilityBlockItem[]>();
+  if (teacherIds.length === 0) return map;
+
+  const { data, error } = await supabase
+    .from("teacher_availability")
+    .select("id, teacher_id, day_of_week, start_time, end_time, timezone")
+    .in("teacher_id", teacherIds)
+    .order("day_of_week", { ascending: true })
+    .order("start_time", { ascending: true });
+
+  if (error) throw error;
+
+  for (const row of data) {
+    const list = map.get(row.teacher_id) ?? [];
+    list.push({ id: row.id, dayOfWeek: row.day_of_week, startTime: row.start_time, endTime: row.end_time, timezone: row.timezone });
+    map.set(row.teacher_id, list);
+  }
+  return map;
+}
+
+/** La vista general pagina los bloques para no truncar la semana al límite de filas de PostgREST. */
+export async function getAllTeacherAvailabilityByIds(
+  supabase: Client,
+  teacherIds: string[]
+): Promise<Map<string, AvailabilityBlockItem[]>> {
+  const map = new Map<string, AvailabilityBlockItem[]>();
+  if (teacherIds.length === 0) return map;
+
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("teacher_availability")
+      .select("id, teacher_id, day_of_week, start_time, end_time, timezone")
+      .in("teacher_id", teacherIds)
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    for (const row of data) {
+      const list = map.get(row.teacher_id) ?? [];
+      list.push({ id: row.id, dayOfWeek: row.day_of_week, startTime: row.start_time, endTime: row.end_time, timezone: row.timezone });
+      map.set(row.teacher_id, list);
+    }
+    if (data.length < pageSize) break;
+  }
+  return map;
+}
+
+/**
+ * Nombres de skill (niveles/programas) de un lote de docentes (RLS teacher_skills_owner ya
+ * permite lectura total a Admin, 0003). Mismos ids de `skills` que `academic_level` para A1..C2,
+ * lo que permite comparar contra classrooms.level directamente por texto.
+ */
+export async function getTeacherSkillNamesByIds(supabase: Client, teacherIds: string[]): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (teacherIds.length === 0) return map;
+
+  const { data, error } = await supabase
+    .from("teacher_skills")
+    .select("teacher_id, skill:skills(name)")
+    .in("teacher_id", teacherIds);
+
+  if (error) throw error;
+
+  for (const row of data) {
+    if (!row.skill) continue;
+    const list = map.get(row.teacher_id) ?? [];
+    list.push(row.skill.name);
+    map.set(row.teacher_id, list);
+  }
+  return map;
 }
 
 /** Combina lo ya resuelto por listTeacherProfiles + getActiveClassroomCounts + el Map de emails

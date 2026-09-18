@@ -44,12 +44,14 @@ interface ProfileListRow {
   archived_at: string | null;
   program: { name: string } | null;
   account_invitations: { accepted_at: string | null } | null;
+  classrooms: { id: number; name: string; status: string }[] | null;
 }
 
 const LIST_SELECT =
-  "id, first_name, last_name, dni, phone, role, level, status, must_change_password, created_at, archived_at, program:programs(name), account_invitations!account_invitations_profile_id_fkey(accepted_at)";
+  "id, first_name, last_name, dni, phone, role, level, status, must_change_password, created_at, archived_at, program:programs(name), account_invitations!account_invitations_profile_id_fkey(accepted_at), classrooms!classrooms_student_id_fkey(id, name, status)";
 
 function mapListRow(row: ProfileListRow): UserListItem {
+  const activeClassroom = row.classrooms?.find((c) => c.status === "active") ?? null;
   return {
     id: row.id,
     firstName: row.first_name,
@@ -63,6 +65,7 @@ function mapListRow(row: ProfileListRow): UserListItem {
     accessStatus: toAccessStatus(row.must_change_password, row.account_invitations),
     createdAt: row.created_at,
     archivedAt: row.archived_at,
+    classroom: activeClassroom ? { id: activeClassroom.id, name: activeClassroom.name } : null,
   };
 }
 

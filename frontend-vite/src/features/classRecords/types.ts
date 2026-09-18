@@ -16,6 +16,9 @@ export interface CorrectClassInput {
   status: ClassRecordStatus;
   minutes: number;
   notes: string | null;
+  /** ISO timestamptz -- opcional, solo se envía si el profesor cambió fecha/hora (AJUSTE 2).
+   * Ignorado por el RPC si la clase ya está pagada (occurred_at sigue inmutable). */
+  occurredAt?: string;
 }
 
 /** Fila de historial de un salón (Slice F) -- el nombre del profesor viene de class_records.teacher_id,

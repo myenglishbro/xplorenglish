@@ -1,13 +1,16 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useUserDetail, usePrograms, useUserEmails } from "@/features/users/hooks";
 import { useTeacherClassrooms } from "@/features/teachers/hooks";
 import { Card } from "@/components/ui/surfaces/Card";
 import { Tag } from "@/components/ui/core/Tag";
 import { Icon } from "@/components/ui/core/Icon";
+import { Button } from "@/components/ui/core/Button";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { UserEditForm } from "@/components/admin/users/UserEditForm";
 import { TeacherProfileForm } from "@/components/admin/teachers/TeacherProfileForm";
+import { TeacherAvailabilityModal } from "@/components/admin/teachers/TeacherAvailabilityModal";
 
 function cardTitle(text: string) {
   return (
@@ -21,6 +24,7 @@ function cardTitle(text: string) {
 /** Portado de src/app/admin/docentes/[id]/page.tsx. */
 export function DocenteDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [showAvailability, setShowAvailability] = useState(false);
   const userQuery = useUserDetail(id ?? "");
   const classroomsQuery = useTeacherClassrooms(id ?? "");
   const programsQuery = usePrograms();
@@ -87,7 +91,23 @@ export function DocenteDetailPage() {
             status={teacherProfile.status === "inactive" ? "inactive" : "active"}
           />
         </Card>
+
+        <Card header={cardTitle("Disponibilidad y niveles")}>
+          <p style={{ margin: "0 0 var(--space-3)", color: "var(--text-muted)" }}>
+            Disponibilidad semanal y niveles registrados por el propio docente.
+          </p>
+          <Button variant="secondary" onClick={() => setShowAvailability(true)} style={{ alignSelf: "flex-start" }}>
+            Ver disponibilidad
+          </Button>
+        </Card>
       </div>
+
+      <TeacherAvailabilityModal
+        open={showAvailability}
+        onClose={() => setShowAvailability(false)}
+        teacherId={user.id}
+        teacherName={`${user.firstName} ${user.lastName}`}
+      />
 
       <Card header={cardTitle("Salones asignados")}>
         {classrooms.length === 0 ? (

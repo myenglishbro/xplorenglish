@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useTeachers } from "@/features/teachers/hooks";
+import { Button } from "@/components/ui/core/Button";
 import { Card } from "@/components/ui/surfaces/Card";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { TeachersTable } from "@/components/admin/teachers/TeachersTable";
+import { AllTeachersAvailabilityGrid } from "@/components/admin/teachers/AllTeachersAvailabilityGrid";
 
 /**
  * Portado de src/app/admin/docentes/page.tsx. El listado muestra teacher_profiles.status
@@ -11,6 +14,7 @@ import { TeachersTable } from "@/components/admin/teachers/TeachersTable";
  */
 export function DocentesListPage() {
   const { data: teachers, isLoading, isError } = useTeachers();
+  const [showAvailability, setShowAvailability] = useState(false);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
@@ -24,6 +28,27 @@ export function DocentesListPage() {
       >
         Docentes
       </h1>
+
+      <Card
+        pad={showAvailability}
+        header={
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-3)", width: "100%" }}>
+            <div>
+              <h2 style={{ margin: 0, font: "var(--weight-bold) var(--text-h4-size)/var(--text-h4-lh) var(--font-display)", color: "var(--text-heading)" }}>
+                Disponibilidad de docentes
+              </h2>
+              <p style={{ margin: "var(--space-2) 0 0", color: "var(--text-muted)" }}>
+                Consulta la disponibilidad semanal registrada por el equipo docente.
+              </p>
+            </div>
+            <Button variant="secondary" icon="calendar" onClick={() => setShowAvailability((shown) => !shown)} aria-expanded={showAvailability}>
+              {showAvailability ? "Ocultar disponibilidad" : "Mostrar disponibilidad"}
+            </Button>
+          </div>
+        }
+      >
+        {showAvailability && <AllTeachersAvailabilityGrid />}
+      </Card>
 
       {isLoading ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-6) 0" }}>

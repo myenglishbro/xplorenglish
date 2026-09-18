@@ -91,6 +91,7 @@ export async function correctClass(supabase: Client, input: CorrectClassInput): 
       p_status: input.status,
       p_minutes: input.minutes,
       p_notes: input.notes as string,
+      p_occurred_at: input.occurredAt,
     })
     .single();
 

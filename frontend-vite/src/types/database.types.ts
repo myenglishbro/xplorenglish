@@ -1218,6 +1218,7 @@ export type Database = {
           p_class_record_id: number
           p_minutes: number
           p_notes: string
+          p_occurred_at?: string
           p_status: Database["public"]["Enums"]["class_record_status"]
         }
         Returns: {

@@ -45,6 +45,9 @@ export interface UserListItem {
   /** No operativo, pero conserva todo su historial -- ver admin_archive_user/admin_restore_user.
    * Independiente de `status`: un usuario archivado puede tener status='active' o 'inactive'. */
   archivedAt: string | null;
+  /** Solo aplica a role="student". Salón activo (classroom_students.status='active' +
+   * classrooms.status='active'), o null si no tiene ninguno asignado. */
+  classroom: { id: number; name: string } | null;
 }
 
 export interface UserListResult {

@@ -44,10 +44,10 @@ export function SidebarNav({ items = [], value, onChange, footer, assetBase = "/
         ...style,
       }}
     >
-      <div style={{ padding: "0 4px" }}>
+      <div style={{ flex: "0 0 auto", padding: "0 4px" }}>
         <Logo height={38} assetBase={assetBase} />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column", gap: 4 }}>
         {items.map((it) => {
           const act = it.value === value;
           return (
@@ -120,7 +120,7 @@ export function SidebarNav({ items = [], value, onChange, footer, assetBase = "/
           );
         })}
       </div>
-      {footer && <div style={{ marginTop: "auto" }}>{footer}</div>}
+      {footer && <div style={{ flex: "0 0 auto", marginTop: "auto" }}>{footer}</div>}
     </nav>
   );
 }

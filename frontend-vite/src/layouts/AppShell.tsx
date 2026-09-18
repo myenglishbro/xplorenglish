@@ -58,7 +58,7 @@ export function AppShell({ profile, navItems, children }: AppShellProps) {
       items={navItems}
       value={activeValue}
       onChange={(value) => navigate(value)}
-      style={isDesktop ? undefined : { minHeight: "100vh" }}
+      style={isDesktop ? undefined : { height: "100%", overflow: "hidden" }}
       footer={
         <Button variant="ghost" icon="sign-out" fullWidth loading={loggingOut} disabled={loggingOut} onClick={handleLogout}>
           Cerrar sesión
@@ -81,12 +81,13 @@ export function AppShell({ profile, navItems, children }: AppShellProps) {
             />
           )}
           <div
+            className="xp-mobile-drawer"
             style={{
               position: "fixed",
               top: 0,
-              bottom: 0,
               left: 0,
               zIndex: 50,
+              overflow: "hidden",
               transform: mobileNavOpen ? "translateX(0)" : "translateX(-100%)",
               transition: "transform var(--transition-control, .2s ease)",
               boxShadow: mobileNavOpen ? "0 10px 40px rgba(15, 23, 42, .25)" : "none",
@@ -94,6 +95,7 @@ export function AppShell({ profile, navItems, children }: AppShellProps) {
           >
             {sidebar}
           </div>
+          <style>{".xp-mobile-drawer{height:100vh;height:100dvh}"}</style>
         </>
       )}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>

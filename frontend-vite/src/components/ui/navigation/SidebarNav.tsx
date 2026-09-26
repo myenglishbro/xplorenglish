@@ -48,11 +48,16 @@ export function SidebarNav({ items = [], value, onChange, footer, assetBase = "/
         <Logo height={38} assetBase={assetBase} />
       </div>
       <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column", gap: 4 }}>
-        {items.map((it) => {
+        {items.map((it, index) => {
           const act = it.value === value;
+          /** Solo se muestra al ENTRAR a una nueva sección -- si el item anterior (inmediatamente
+           * adyacente en el array, mismo orden que ya trae `items`) comparte el mismo `section`, no
+           * se repite el heading. No deduplica globalmente: la misma sección puede reaparecer más
+           * adelante si hay items sin sección (u otra sección) de por medio. */
+          const isNewSection = Boolean(it.section) && it.section !== items[index - 1]?.section;
           return (
             <React.Fragment key={it.value}>
-              {it.section && (
+              {isNewSection && (
                 <div
                   style={{
                     padding: "14px 10px 6px",

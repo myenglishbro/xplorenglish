@@ -72,6 +72,7 @@ export function DashboardPage() {
 
   const now = new Date();
   const balanceAlertsCount = balanceAlertsQuery.data ? balanceAlertsQuery.data.length : balanceAlertsQuery.isError ? 0 : null;
+  const showAlertsGrid = data.alerts.status === "ok" && !!balanceAlertsQuery.data && balanceAlertsQuery.data.length + data.alerts.data.length > 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
@@ -87,29 +88,44 @@ export function DashboardPage() {
         <SectionError />
       )}
 
-      <style>{`
-        .xp-dashboard-agenda-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: var(--space-5); align-items: start; }
-        @media (max-width: 900px) { .xp-dashboard-agenda-row { grid-template-columns: 1fr; } }
-      `}</style>
-      <div className="xp-dashboard-agenda-row">
-        <Card>{data.agenda.status === "ok" ? <WeeklyAgenda blocks={data.agenda.data} /> : <SectionError />}</Card>
+      {/* Agenda semanal a ancho completo (segunda iteración de layout): el problema real de
+          legibilidad era el ancho disponible, no el estilo de las cards de evento -- compartir fila
+          con Alertas dejaba muy poco espacio horizontal para 7 días + clases solapadas. Alertas
+          baja debajo, a su propio ancho completo. */}
+      <Card>{data.agenda.status === "ok" ? <WeeklyAgenda blocks={data.agenda.data} /> : <SectionError />}</Card>
 
-        <Card header={cardTitle("Alertas")}>
-          {data.alerts.status === "ok" ? (
-            balanceAlertsQuery.isLoading ? (
-              <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-4) 0" }}>
-                <Spinner size={22} label="Cargando…" />
-              </div>
-            ) : balanceAlertsQuery.isError || !balanceAlertsQuery.data ? (
-              <SectionError />
-            ) : (
-              <OperationalAlertsPanel balanceAlerts={balanceAlertsQuery.data} operationalAlerts={data.alerts.data} />
-            )
-          ) : (
+      {/* `.xp-dashboard-alerts-grid` reparte las filas de OperationalAlertsPanel en columnas cuando
+          hay suficiente ancho, sin tocar ese componente (fuera del alcance permitido de este
+          cambio): su raíz ya es un `display:flex;flexDirection:column` fijo por estilo inline, así
+          que necesitamos `!important` para reemplazar SOLO `display` (nunca gap/orden/contenido) --
+          la clase solo se aplica cuando `showAlertsGrid` confirma que ese hijo es la lista real de
+          alertas (nunca el EmptyState/Spinner/SectionError, que deben seguir centrados en una sola
+          columna). `auto-fit` colapsa las columnas vacías: con 1 sola alerta se ve igual que antes
+          (una columna), con varias se reparten en 2+ según el ancho disponible. */}
+      <style>{`
+        .xp-dashboard-alerts-grid > div {
+          display: grid !important;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: var(--space-3);
+        }
+      `}</style>
+      <Card header={cardTitle("Alertas")}>
+        {data.alerts.status === "ok" ? (
+          balanceAlertsQuery.isLoading ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-4) 0" }}>
+              <Spinner size={22} label="Cargando…" />
+            </div>
+          ) : balanceAlertsQuery.isError || !balanceAlertsQuery.data ? (
             <SectionError />
-          )}
-        </Card>
-      </div>
+          ) : (
+            <div className={showAlertsGrid ? "xp-dashboard-alerts-grid" : undefined}>
+              <OperationalAlertsPanel balanceAlerts={balanceAlertsQuery.data} operationalAlerts={data.alerts.data} />
+            </div>
+          )
+        ) : (
+          <SectionError />
+        )}
+      </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "var(--space-5)" }}>
         <Card header={cardTitle("Actividad reciente")}>

@@ -7,7 +7,7 @@ import { ACADEMIC_LEVELS, type ProgramOption } from "@/server/admin/users/types"
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos los estados" },
   { value: "active", label: "Activo" },
-  { value: "archived", label: "Archivado" },
+  { value: "archived", label: "Finalizado" },
 ];
 
 export interface ClassroomsFilterBarProps {
@@ -50,7 +50,19 @@ export function ClassroomsFilterBar({ programs }: ClassroomsFilterBarProps) {
         <Select value={searchParams.get("level") ?? "all"} options={levelOptions} onChange={(e) => applyParams({ level: e.target.value })} />
       </div>
       <div style={{ width: 200 }}>
-        <Select value={searchParams.get("status") ?? "all"} options={STATUS_OPTIONS} onChange={(e) => applyParams({ status: e.target.value })} />
+        {/* Distinto del resto de filtros (applyParams borra el param cuando vale "all"): acá "all"
+            debe quedar explícito en la URL (?status=all), porque el default de la página ya NO es
+            "all" sino "active" (operación diaria) -- si "Todos los estados" borrara el param,
+            la selección "rebotaría" a "Activo" en el siguiente render en vez de mantenerse. */}
+        <Select
+          value={searchParams.get("status") ?? "active"}
+          options={STATUS_OPTIONS}
+          onChange={(e) => {
+            const params = new URLSearchParams(searchParams);
+            params.set("status", e.target.value);
+            setSearchParams(params);
+          }}
+        />
       </div>
     </div>
   );

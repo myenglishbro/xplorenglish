@@ -19,6 +19,7 @@ interface Row {
     level: Database["public"]["Enums"]["academic_level"];
     description: string | null;
     schedule_notes: string | null;
+    status: string;
     program: { name: string } | null;
   } | null;
 }
@@ -27,13 +28,20 @@ interface Row {
  * Sin PRIMARY/SUBSTITUTE (Slice A/F) -- cualquier fila activa es un profesor habilitado. .eq("status",
  * "active") filtra solo LA MEMBRESÍA de este profesor en cada salón (si lo deshabilitaron, deja de
  * aparecer en su lista, aunque su historial de class_records se conserve intacto).
+ *
+ * `classrooms!inner` + `.eq("classrooms.status","active")` (auditoría de lifecycle de salones,
+ * 0044): defensa/optimización explícita, NO la autoridad real -- RLS (class_records_select ->
+ * can_access_classroom -> is_classroom_teacher, que ya exige classrooms.status='active' desde
+ * 0015) ya excluye un salón archivado por completo, incluso sin este filtro. Mismo criterio que
+ * getMyWeeklyScheduleAsTeacher (server/teacher/schedule/queries.ts).
  */
 export async function listMyClassroomsAsTeacher(supabase: Client, teacherId: string): Promise<MyClassroomItem[]> {
   const { data, error } = await supabase
     .from("classroom_teachers")
-    .select(`classroom:classrooms(id, name, level, description, schedule_notes, program:programs(name))`)
+    .select(`classroom:classrooms!inner(id, name, level, description, schedule_notes, status, program:programs(name))`)
     .eq("teacher_id", teacherId)
     .eq("status", "active")
+    .eq("classrooms.status", "active")
     .returns<Row[]>();
 
   if (error) throw error;

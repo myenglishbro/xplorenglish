@@ -25,12 +25,17 @@ interface Row {
  * El alumno del salón es classrooms.student_id (Slice A/F) -- filtro directo por esa columna, sin
  * classroom_students. RLS (private.is_classroom_student) ya excluye salones archivados y salones
  * de otros alumnos, así que este filtro es solo una optimización de consulta, no la autoridad real.
+ *
+ * `.eq("status","active")` (auditoría de lifecycle de salones, 0044): defensa/optimización
+ * explícita, NO la autoridad real -- ya documentado arriba que RLS excluye archivados. Mismo
+ * criterio que getMyWeeklyScheduleAsStudent (server/student/schedule/queries.ts).
  */
 export async function listMyClassroomsAsStudent(supabase: Client, studentId: string): Promise<MyClassroomItem[]> {
   const { data, error } = await supabase
     .from("classrooms")
     .select("id, name, level, description, schedule_notes, program:programs(name)")
     .eq("student_id", studentId)
+    .eq("status", "active")
     .returns<Row[]>();
 
   if (error) throw error;

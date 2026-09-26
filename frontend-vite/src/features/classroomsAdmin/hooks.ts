@@ -114,12 +114,28 @@ export function useUpdateClassroom(classroomId: number) {
   });
 }
 
+const CLASSROOM_STATUS_RPC_ERROR_MESSAGES: Record<string, string> = {
+  NOT_AUTHORIZED: "No tienes permisos para realizar esta acción.",
+  CLASSROOM_NOT_FOUND: "El salón no existe.",
+  INVALID_STATUS_TRANSITION: "El salón ya está en ese estado.",
+};
+
+function parseClassroomStatusRpcError(error: { message: string }): Error {
+  const code = error.message.split(":")[0]?.trim() ?? "";
+  return new Error(CLASSROOM_STATUS_RPC_ERROR_MESSAGES[code] ?? "No pudimos actualizar el estado del salón. Inténtalo de nuevo en unos minutos.");
+}
+
+/** admin_set_classroom_status (0044) -- ya NO es un UPDATE directo del browser: finalizar/
+ * reactivar un salón es una acción operativa importante, con la misma autoridad/auditoría
+ * (audit_logs, CLASSROOM_ARCHIVED/CLASSROOM_RESTORED) que admin_archive_user/admin_restore_user.
+ * classroom_teachers/class_schedules/class_records/hours_movements/teacher_payments/
+ * student_payments nunca se tocan -- el RPC solo cambia classrooms.status. */
 export function useSetClassroomStatus(classroomId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (status: "active" | "archived") => {
-      const { error } = await supabase.from("classrooms").update({ status }).eq("id", classroomId);
-      if (error) throw new Error("No pudimos actualizar el estado del salón. Inténtalo de nuevo en unos minutos.");
+      const { error } = await supabase.rpc("admin_set_classroom_status", { p_classroom_id: classroomId, p_status: status });
+      if (error) throw parseClassroomStatusRpcError(error);
     },
     onSuccess: () => invalidateClassroomQueries(queryClient, classroomId),
   });

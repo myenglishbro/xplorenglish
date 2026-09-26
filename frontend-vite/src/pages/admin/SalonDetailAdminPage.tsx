@@ -89,7 +89,7 @@ export function SalonDetailAdminPage() {
             {classroom.name}
           </h1>
           <Tag tone="neutral">{classroom.level}</Tag>
-          <Tag tone={classroom.status === "active" ? "success" : "neutral"}>{classroom.status === "active" ? "Activo" : "Archivado"}</Tag>
+          <Tag tone={classroom.status === "active" ? "success" : "neutral"}>{classroom.status === "active" ? "Activo" : "Finalizado"}</Tag>
         </div>
       </div>
 
@@ -102,7 +102,7 @@ export function SalonDetailAdminPage() {
           <Card header={cardTitle("Estado")}>
             <ClassroomStatusToggle classroomId={classroom.id} status={classroom.status} />
             <p style={{ marginTop: "var(--space-3)", font: "var(--weight-regular) var(--text-caption-size)/1.4 var(--font-body)", color: "var(--text-muted)" }}>
-              Archivar no borra ni desactiva al estudiante ni a los profesores asignados -- solo oculta el salón de sus listados.
+              Finalizar no borra ni desactiva al estudiante ni a los profesores asignados -- solo saca el salón de la operación diaria. El historial de clases y pagos se conserva.
             </p>
           </Card>
 

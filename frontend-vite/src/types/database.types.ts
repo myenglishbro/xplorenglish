@@ -1199,6 +1199,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_set_classroom_status: {
+        Args: { p_classroom_id: number; p_reason?: string; p_status: string }
+        Returns: {
+          created_at: string
+          description: string | null
+          id: number
+          level: Database["public"]["Enums"]["academic_level"]
+          name: string
+          program_id: number
+          schedule_notes: string | null
+          status: string
+          student_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "classrooms"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_teacher_payment_summary: {
         Args: never
         Returns: {

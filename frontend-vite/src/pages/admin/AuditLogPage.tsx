@@ -13,12 +13,15 @@ const ACTION_LABEL: Record<string, string> = {
   HOURS_PACKAGE_CANCELLED: "Paquete cancelado",
   HOURS_PACKAGE_REFUNDED: "Paquete reembolsado",
   STUDENT_PAYMENT_REFUNDED: "Pago reembolsado",
+  CLASSROOM_ARCHIVED: "Salón finalizado",
+  CLASSROOM_RESTORED: "Salón reactivado",
 };
 
 const ENTITY_TYPE_LABEL: Record<string, string> = {
   profile: "Usuario",
   hours_package: "Paquete de horas",
   student_payment: "Pago de estudiante",
+  classroom: "Salón",
 };
 
 /**

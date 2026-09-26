@@ -68,9 +68,18 @@ function ClassroomsTabContent() {
   const [searchParams] = useSearchParams();
   const programId = searchParams.get("program") ? Number(searchParams.get("program")) : undefined;
   const level = VALID_LEVELS.includes(searchParams.get("level") as AcademicLevel) ? (searchParams.get("level") as AcademicLevel) : "all";
-  const status = VALID_STATUSES.includes(searchParams.get("status") as ClassroomStatus) ? (searchParams.get("status") as ClassroomStatus) : "all";
+
+  // Default = "active" (la operación diaria solo debe mostrar salones activos por defecto) --
+  // pero un ?status= explícito en la URL SIEMPRE se respeta, incluyendo "all" (el fallback previo,
+  // ahora ya no el default). `hasExplicitStatusFilter` distingue "el admin eligió un estado" de
+  // "cayó en el default silencioso", para no mostrar el mensaje de "ajusta los filtros" cuando
+  // simplemente no hay salones activos.
+  const rawStatus = searchParams.get("status");
+  const hasExplicitStatusFilter = rawStatus === "all" || VALID_STATUSES.includes(rawStatus as ClassroomStatus);
+  const status: ClassroomStatus | "all" = rawStatus === "all" ? "all" : VALID_STATUSES.includes(rawStatus as ClassroomStatus) ? (rawStatus as ClassroomStatus) : "active";
+
   const search = searchParams.get("q") ?? "";
-  const hasActiveFilters = !!search || programId !== undefined || level !== "all" || status !== "all";
+  const hasActiveFilters = !!search || programId !== undefined || level !== "all" || hasExplicitStatusFilter;
 
   const classroomsQuery = useClassrooms({ programId, level, status, search });
   const programsQuery = usePrograms();

@@ -833,6 +833,7 @@ export type Database = {
           idempotency_key: string
           paid_at: string | null
           payment_method: string
+          receipt_status: Database["public"]["Enums"]["receipt_status"] | null
           reference: string | null
           status: Database["public"]["Enums"]["payment_status"]
           student_id: string
@@ -845,6 +846,7 @@ export type Database = {
           idempotency_key: string
           paid_at?: string | null
           payment_method: string
+          receipt_status?: Database["public"]["Enums"]["receipt_status"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           student_id: string
@@ -857,6 +859,7 @@ export type Database = {
           idempotency_key?: string
           paid_at?: string | null
           payment_method?: string
+          receipt_status?: Database["public"]["Enums"]["receipt_status"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           student_id?: string
@@ -960,6 +963,7 @@ export type Database = {
           created_at: string
           hourly_rate: number
           profile_id: string
+          receipt_drive_url: string | null
           status: string
           updated_at: string
         }
@@ -968,6 +972,7 @@ export type Database = {
           created_at?: string
           hourly_rate: number
           profile_id: string
+          receipt_drive_url?: string | null
           status?: string
           updated_at?: string
         }
@@ -976,6 +981,7 @@ export type Database = {
           created_at?: string
           hourly_rate?: number
           profile_id?: string
+          receipt_drive_url?: string | null
           status?: string
           updated_at?: string
         }
@@ -1119,6 +1125,28 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "hours_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_set_receipt_status: {
+        Args: { p_payment_id: number; p_reason?: string; p_status: Database["public"]["Enums"]["receipt_status"] }
+        Returns: {
+          amount: number
+          created_at: string
+          currency: string
+          id: number
+          idempotency_key: string
+          paid_at: string | null
+          payment_method: string
+          receipt_status: Database["public"]["Enums"]["receipt_status"] | null
+          reference: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          student_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "student_payments"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1429,6 +1457,7 @@ export type Database = {
         | "cancelled"
         | "refunded"
       payment_status: "pending" | "completed" | "failed" | "refunded"
+      receipt_status: "pending" | "issued" | "sent" | "not_applicable"
       placement_attempt_status:
         | "not_started"
         | "in_progress"
@@ -1601,6 +1630,7 @@ export const Constants = {
         "refunded",
       ],
       payment_status: ["pending", "completed", "failed", "refunded"],
+      receipt_status: ["pending", "issued", "sent", "not_applicable"],
       placement_attempt_status: [
         "not_started",
         "in_progress",

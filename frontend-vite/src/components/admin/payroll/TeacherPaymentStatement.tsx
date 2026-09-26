@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/core/Button";
 import { Modal } from "@/components/ui/surfaces/Modal";
 import { Field } from "@/components/ui/forms/Field";
 import { Input } from "@/components/ui/forms/Input";
+import { Select } from "@/components/ui/forms/Select";
 import { Alert } from "@/components/ui/feedback/Alert";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { formatMinutesAsHours } from "@/lib/format/minutes";
@@ -27,13 +28,34 @@ const STATUS_LABEL: Record<TeacherPaymentStatementRow["status"], string> = {
  * final). Los totales de selección son puramente UX -- pay_teacher_classes recalcula/valida todo
  * en el backend.
  */
+const ALL_STUDENTS = "all";
+
 export function TeacherPaymentStatement({ teacherId, rows }: { teacherId: string; rows: TeacherPaymentStatementRow[] }) {
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [reference, setReference] = React.useState("");
+  const [studentFilter, setStudentFilter] = React.useState(ALL_STUDENTS);
   const payClasses = usePayTeacherClasses(teacherId);
 
-  const selectableRows = rows.filter((r) => r.financialStatus === "pending");
+  const studentOptions = React.useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const row of rows) {
+      if (row.studentId) byId.set(row.studentId, row.studentName);
+    }
+    return [
+      { value: ALL_STUDENTS, label: "Todos los alumnos" },
+      ...[...byId.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label })),
+    ];
+  }, [rows]);
+
+  const visibleRows = studentFilter === ALL_STUDENTS ? rows : rows.filter((r) => r.studentId === studentFilter);
+
+  function handleStudentFilterChange(value: string) {
+    setStudentFilter(value);
+    setSelected(new Set());
+  }
+
+  const selectableRows = visibleRows.filter((r) => r.financialStatus === "pending");
   const allSelectableSelected = selectableRows.length > 0 && selectableRows.every((r) => selected.has(r.id));
 
   function toggle(id: number) {
@@ -107,17 +129,36 @@ export function TeacherPaymentStatement({ teacherId, rows }: { teacherId: string
         </EmptyState>
       ) : (
         <>
-          {selectableRows.length > 0 && (
-            <div>
-              <Button variant="ghost" size="sm" onClick={toggleAll}>
-                {allSelectableSelected ? "Deseleccionar todas" : "Seleccionar todas las pendientes"}
-              </Button>
+          {studentOptions.length > 2 && (
+            <div style={{ maxWidth: 320 }}>
+              <Field label="Alumno" htmlFor="studentFilter">
+                <Select
+                  id="studentFilter"
+                  value={studentFilter}
+                  options={studentOptions}
+                  onChange={(e) => handleStudentFilterChange(e.target.value)}
+                />
+              </Field>
             </div>
           )}
 
-          <Card pad={false}>
-            <DataTable columns={columns} rows={rows} dense />
-          </Card>
+          {visibleRows.length === 0 ? (
+            <EmptyState icon="clock-counter-clockwise" title="No hay clases para este alumno" />
+          ) : (
+            <>
+              {selectableRows.length > 0 && (
+                <div>
+                  <Button variant="ghost" size="sm" onClick={toggleAll}>
+                    {allSelectableSelected ? "Deseleccionar todas" : "Seleccionar todas las pendientes"}
+                  </Button>
+                </div>
+              )}
+
+              <Card pad={false}>
+                <DataTable columns={columns} rows={visibleRows} dense />
+              </Card>
+            </>
+          )}
 
           <div
             style={{

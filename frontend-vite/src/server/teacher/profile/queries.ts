@@ -10,10 +10,11 @@ interface Row {
   last_name: string;
   dni: string;
   phone: string;
-  teacher_profile: { bio: string | null; hourly_rate: number; status: string } | null;
+  teacher_profile: { bio: string | null; hourly_rate: number; status: string; receipt_drive_url: string | null } | null;
 }
 
-const SELECT = "id, first_name, last_name, dni, phone, teacher_profile:teacher_profiles!teacher_profiles_profile_id_fkey(bio, hourly_rate, status)";
+const SELECT =
+  "id, first_name, last_name, dni, phone, teacher_profile:teacher_profiles!teacher_profiles_profile_id_fkey(bio, hourly_rate, status, receipt_drive_url)";
 
 /**
  * profileId siempre viene de auth.getUser() en el caller (page.tsx vía getAuthUser()), nunca de
@@ -36,7 +37,12 @@ export async function getMyTeacherProfile(supabase: Client, profileId: string): 
     dni: data.dni,
     phone: data.phone,
     teacherProfile: data.teacher_profile
-      ? { bio: data.teacher_profile.bio, hourlyRate: data.teacher_profile.hourly_rate, status: data.teacher_profile.status }
+      ? {
+          bio: data.teacher_profile.bio,
+          hourlyRate: data.teacher_profile.hourly_rate,
+          status: data.teacher_profile.status,
+          receiptDriveUrl: data.teacher_profile.receipt_drive_url,
+        }
       : null,
   };
 }

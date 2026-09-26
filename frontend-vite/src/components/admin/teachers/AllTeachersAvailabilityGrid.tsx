@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Alert } from "@/components/ui/feedback/Alert";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { Select } from "@/components/ui/forms/Select";
-import { DAY_OF_WEEK_LABELS, WEEK_DISPLAY_ORDER } from "@/features/availability/types";
-import { coversInterval } from "@/features/availability/coverage";
+import { DAY_OF_WEEK_LABELS, WEEK_DISPLAY_ORDER, type OccupiedBlockItem } from "@/features/availability/types";
+import { coversInterval, findOverlapping } from "@/features/availability/coverage";
 import { useAllTeacherAvailability } from "@/features/teachers/hooks";
 
 const SLOT_MINUTES = 60;
@@ -38,11 +38,17 @@ export function AllTeachersAvailabilityGrid() {
   ];
 
   const cells = new Map<string, { id: string; name: string }[]>();
+  const occupiedCells = new Map<string, OccupiedBlockItem[]>();
   for (const teacher of visibleTeachers) {
     for (const day of WEEK_DISPLAY_ORDER) {
       for (const minute of SLOT_STARTS) {
-        if (!coversInterval(teacher.availability, day, minute, minute + SLOT_MINUTES)) continue;
         const key = `${day}-${minute}`;
+        const overlaps = findOverlapping(teacher.occupied, day, minute, minute + SLOT_MINUTES);
+        if (overlaps.length > 0) {
+          occupiedCells.set(key, [...(occupiedCells.get(key) ?? []), ...overlaps]);
+          continue; // ocupado nunca cuenta como disponible, aunque haya disponibilidad declarada
+        }
+        if (!coversInterval(teacher.availability, day, minute, minute + SLOT_MINUTES)) continue;
         const names = cells.get(key) ?? [];
         if (!names.some((person) => person.id === teacher.id)) names.push({ id: teacher.id, name: teacher.name });
         cells.set(key, names);
@@ -90,11 +96,32 @@ export function AllTeachersAvailabilityGrid() {
                   {timeLabel(minute)}–{timeLabel(minute + SLOT_MINUTES)}
                 </th>
                 {WEEK_DISPLAY_ORDER.map((day) => {
-                  const names = cells.get(`${day}-${minute}`) ?? [];
+                  const key = `${day}-${minute}`;
+                  const names = cells.get(key) ?? [];
+                  const occupied = occupiedCells.get(key) ?? [];
+                  const occupiedStudentNames = [...new Set(occupied.map((block) => block.studentName))];
+                  const showOccupied = !!selectedTeacher && occupiedStudentNames.length > 0;
                   return (
-                    <td key={day} style={{ verticalAlign: "top", height: selectedTeacher ? 42 : 72, padding: "8px 10px", borderBottom: "1px solid var(--border-subtle)", borderLeft: "1px solid var(--border-subtle)", background: names.length ? "var(--cyan-50)" : undefined }}>
+                    <td
+                      key={day}
+                      style={{
+                        verticalAlign: "top",
+                        height: selectedTeacher ? 42 : 72,
+                        padding: "8px 10px",
+                        borderBottom: "1px solid var(--border-subtle)",
+                        borderLeft: "1px solid var(--border-subtle)",
+                        background: showOccupied ? "var(--warning-bg)" : names.length ? "var(--cyan-50)" : undefined,
+                      }}
+                    >
                       {selectedTeacher ? (
-                        names.length > 0 && <span style={{ fontWeight: "var(--weight-semibold)", color: "var(--cyan-700)" }}>Disponible</span>
+                        showOccupied ? (
+                          <span style={{ fontWeight: "var(--weight-semibold)", color: "var(--warning-fg)" }} title={occupiedStudentNames.join(", ")}>
+                            Ocupado · {occupiedStudentNames[0]}
+                            {occupiedStudentNames.length > 1 ? ` +${occupiedStudentNames.length - 1}` : ""}
+                          </span>
+                        ) : (
+                          names.length > 0 && <span style={{ fontWeight: "var(--weight-semibold)", color: "var(--cyan-700)" }}>Disponible</span>
+                        )
                       ) : names.length > 0 ? (
                         <>
                           <div style={{ fontWeight: "var(--weight-bold)", color: "var(--cyan-700)", marginBottom: 2 }}>

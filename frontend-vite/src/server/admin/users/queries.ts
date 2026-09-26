@@ -50,8 +50,9 @@ interface ProfileListRow {
 const LIST_SELECT =
   "id, first_name, last_name, dni, phone, role, level, status, must_change_password, created_at, archived_at, program:programs(name), account_invitations!account_invitations_profile_id_fkey(accepted_at), classrooms!classrooms_student_id_fkey(id, name, status)";
 
-function mapListRow(row: ProfileListRow): UserListItem {
+function mapListRow(row: ProfileListRow, hoursByStudent: Map<string, { purchasedMinutes: number; balanceMinutes: number }>): UserListItem {
   const activeClassroom = row.classrooms?.find((c) => c.status === "active") ?? null;
+  const hours = row.role === "student" ? (hoursByStudent.get(row.id) ?? { purchasedMinutes: 0, balanceMinutes: 0 }) : null;
   return {
     id: row.id,
     firstName: row.first_name,
@@ -66,7 +67,49 @@ function mapListRow(row: ProfileListRow): UserListItem {
     createdAt: row.created_at,
     archivedAt: row.archived_at,
     classroom: activeClassroom ? { id: activeClassroom.id, name: activeClassroom.name } : null,
+    hoursPurchasedMinutes: hours?.purchasedMinutes ?? null,
+    hoursBalanceMinutes: hours?.balanceMinutes ?? null,
   };
+}
+
+/** Estados de hours_packages que representan una compra efectivamente vigente en el histórico
+ * (FIX 9): 'active'/'exhausted'/'expired' describen cómo se consumió un paquete legítimamente
+ * pagado (create_hour_package, 0009, siempre crea payment 'completed' + package + movimiento
+ * 'purchase' en la misma transacción -- nunca existe un hours_package "pendiente"). 'cancelled'/
+ * 'refunded' (0037/0038) revierten ese paquete con un movimiento 'adjustment' compensatorio y por
+ * tanto NUNCA deben contar como horas compradas -- excluirlos acá es exactamente equivalente a "el
+ * neto histórico después de cancelaciones/reembolsos", sin necesidad de tocar hours_movements para
+ * este número. */
+const PURCHASED_PACKAGE_STATUSES = ["active", "exhausted", "expired"] as const;
+
+/** Horas compradas (histórico válido) por lote de estudiantes -- 1 query, nunca una por alumno. */
+async function fetchPurchasedMinutesByStudent(supabase: Client, studentIds: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (studentIds.length === 0) return map;
+
+  const { data, error } = await supabase
+    .from("hours_packages")
+    .select("student_id, total_minutes")
+    .in("student_id", studentIds)
+    .in("status", PURCHASED_PACKAGE_STATUSES);
+  if (error) throw error;
+
+  for (const row of data) map.set(row.student_id, (map.get(row.student_id) ?? 0) + row.total_minutes);
+  return map;
+}
+
+/** Saldo actual por lote de estudiantes -- SUM(hours_movements.minutes_delta), la única fuente de
+ * verdad del saldo (mismo criterio que server/hours/queries.ts::getStudentTotalBalance y
+ * server/admin/classrooms/queries.ts::fetchStudentBalances). 1 query, nunca una por alumno. */
+async function fetchBalanceMinutesByStudent(supabase: Client, studentIds: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (studentIds.length === 0) return map;
+
+  const { data, error } = await supabase.from("hours_movements").select("student_id, minutes_delta").in("student_id", studentIds);
+  if (error) throw error;
+
+  for (const row of data) map.set(row.student_id, (map.get(row.student_id) ?? 0) + row.minutes_delta);
+  return map;
 }
 
 /**
@@ -100,8 +143,17 @@ export async function listUsers(supabase: Client, filters: UserListFilters): Pro
 
   if (error) throw error;
 
+  const studentIds = [...new Set(data.filter((r) => r.role === "student").map((r) => r.id))];
+  const [purchasedByStudent, balanceByStudent] = await Promise.all([
+    fetchPurchasedMinutesByStudent(supabase, studentIds),
+    fetchBalanceMinutesByStudent(supabase, studentIds),
+  ]);
+  const hoursByStudent = new Map(
+    studentIds.map((id) => [id, { purchasedMinutes: purchasedByStudent.get(id) ?? 0, balanceMinutes: balanceByStudent.get(id) ?? 0 }]),
+  );
+
   return {
-    items: data.map(mapListRow),
+    items: data.map((row) => mapListRow(row, hoursByStudent)),
     totalCount: count ?? 0,
     page,
     pageSize: USERS_PAGE_SIZE,
@@ -123,14 +175,14 @@ interface ProfileDetailRow {
   updated_at: string;
   archived_at: string | null;
   program: { name: string } | null;
-  teacher_profile: { hourly_rate: number; status: string; bio: string | null } | null;
+  teacher_profile: { hourly_rate: number; status: string; bio: string | null; receipt_drive_url: string | null } | null;
   account_invitations: { accepted_at: string | null } | null;
 }
 
 const DETAIL_SELECT = `
   id, first_name, last_name, dni, phone, role, level, status, must_change_password, program_id, created_at, updated_at, archived_at,
   program:programs(name),
-  teacher_profile:teacher_profiles!teacher_profiles_profile_id_fkey(hourly_rate, status, bio),
+  teacher_profile:teacher_profiles!teacher_profiles_profile_id_fkey(hourly_rate, status, bio, receipt_drive_url),
   account_invitations!account_invitations_profile_id_fkey(accepted_at)
 `;
 
@@ -160,7 +212,12 @@ export async function getUserDetail(supabase: Client, id: string): Promise<UserD
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     teacherProfile: data.teacher_profile
-      ? { hourlyRate: data.teacher_profile.hourly_rate, status: data.teacher_profile.status, bio: data.teacher_profile.bio }
+      ? {
+          hourlyRate: data.teacher_profile.hourly_rate,
+          status: data.teacher_profile.status,
+          bio: data.teacher_profile.bio,
+          receiptDriveUrl: data.teacher_profile.receipt_drive_url,
+        }
       : null,
     archivedAt: data.archived_at,
   };

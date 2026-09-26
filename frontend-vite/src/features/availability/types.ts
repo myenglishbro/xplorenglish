@@ -20,3 +20,13 @@ export interface AvailabilityBlockDraft {
   startTime: string;
   endTime: string;
 }
+
+/** Ocupación real de un docente, DERIVADA de sus asignaciones activas a salones y el horario
+ * recurrente de esos salones (class_schedules) -- nunca almacenada en teacher_availability. */
+export interface OccupiedBlockItem {
+  classroomId: number;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  studentName: string;
+}

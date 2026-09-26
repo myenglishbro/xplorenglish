@@ -1,5 +1,5 @@
 import type { PackageStatus } from "@/server/hours/types";
-import type { HoursMovementType } from "@/server/payments/types";
+import type { HoursMovementType, ReceiptStatus } from "@/server/payments/types";
 
 /**
  * Vista admin de un paquete -- misma fuente de verdad que HoursPackageItem (server/hours/types.ts,
@@ -23,6 +23,9 @@ export interface AdminHourPackageListItem {
   remainingMinutes: number;
   purchasedAt: string;
   status: PackageStatus;
+  /** Estado de boleta/comprobante de venta del pago asociado (FIX 11) -- READ-ONLY acá; la edición
+   * vive exclusivamente en Admin > Pagos estudiantes. null = histórico sin clasificar. */
+  receiptStatus: ReceiptStatus | null;
 }
 
 /** Fila cruda del ledger (hours_movements) -- ningún cálculo, cada fila es un hecho ya registrado

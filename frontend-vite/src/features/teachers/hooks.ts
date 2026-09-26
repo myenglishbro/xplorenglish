@@ -6,6 +6,7 @@ import {
   getActiveClassroomCounts,
   getTeacherAvailabilityByIds,
   getAllTeacherAvailabilityByIds,
+  getTeacherOccupiedBlocksByIds,
   getTeacherSkillNamesByIds,
   toTeacherListItem,
 } from "@/server/admin/teachers/queries";
@@ -88,18 +89,24 @@ export function useTeacherAvailabilityAndSkills(teacherId: string) {
   });
 }
 
-/** Vista conjunta de Admin > Docentes: nombres de profiles y bloques de teacher_availability. */
+/** Vista conjunta de Admin > Docentes: nombres de profiles, bloques de teacher_availability
+ * (disponibilidad declarada) y ocupación real derivada de class_schedules (FIX 2, segunda etapa). */
 export function useAllTeacherAvailability() {
   return useQuery({
     queryKey: ["admin-all-teacher-availability"] as const,
     queryFn: async () => {
       const teachers = await listTeacherProfiles(supabase);
-      const availabilityByTeacher = await getAllTeacherAvailabilityByIds(supabase, teachers.map((teacher) => teacher.id));
+      const teacherIds = teachers.map((teacher) => teacher.id);
+      const [availabilityByTeacher, occupiedByTeacher] = await Promise.all([
+        getAllTeacherAvailabilityByIds(supabase, teacherIds),
+        getTeacherOccupiedBlocksByIds(supabase, teacherIds),
+      ]);
       return teachers.map((teacher) => ({
         id: teacher.id,
         name: `${teacher.firstName} ${teacher.lastName}`.trim(),
         teacherStatus: teacher.teacherStatus,
         availability: availabilityByTeacher.get(teacher.id) ?? [],
+        occupied: occupiedByTeacher.get(teacher.id) ?? [],
       }));
     },
   });
@@ -108,13 +115,15 @@ export function useAllTeacherAvailability() {
 export type UpdateTeacherProfileFieldErrors = Partial<Record<keyof UpdateTeacherProfileInput, string>>;
 
 /**
- * Solo edita teacher_profiles (hourly_rate/bio/status) -- browser-direct, teacher_profiles_admin_write
- * (0003) da a los admins escritura total sobre esta tabla. Nunca profiles.role ni classroom_teachers.
+ * Solo edita teacher_profiles (hourly_rate/bio/status/receipt_drive_url) -- browser-direct,
+ * teacher_profiles_admin_write (0003) da a los admins escritura total sobre esta tabla. Nunca
+ * profiles.role ni classroom_teachers. receipt_drive_url (FIX 2, segunda etapa): Xplore solo
+ * guarda y abre esta URL, nunca sube ni verifica archivos de Drive.
  */
 export function useUpdateTeacherProfile(profileId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { hourlyRate: unknown; bio: unknown; status: unknown }) => {
+    mutationFn: async (input: { hourlyRate: unknown; bio: unknown; status: unknown; receiptDriveUrl: unknown }) => {
       const { data: profile, error: profileError } = await supabase.from("profiles").select("role").eq("id", profileId).maybeSingle();
       if (profileError) throw new Error("No pudimos verificar el perfil. Inténtalo de nuevo en unos minutos.");
       if (!profile || profile.role !== "teacher") throw new Error("Este usuario no es un docente.");
@@ -129,8 +138,11 @@ export function useUpdateTeacherProfile(profileId: string) {
         throw { fieldErrors } as { fieldErrors: UpdateTeacherProfileFieldErrors };
       }
 
-      const { hourlyRate, bio, status } = parsed.data;
-      const { error } = await supabase.from("teacher_profiles").update({ hourly_rate: hourlyRate, bio, status }).eq("profile_id", profileId);
+      const { hourlyRate, bio, status, receiptDriveUrl } = parsed.data;
+      const { error } = await supabase
+        .from("teacher_profiles")
+        .update({ hourly_rate: hourlyRate, bio, status, receipt_drive_url: receiptDriveUrl })
+        .eq("profile_id", profileId);
       if (error) throw new Error("No pudimos guardar los cambios. Inténtalo de nuevo en unos minutos.");
     },
     onSuccess: () => {

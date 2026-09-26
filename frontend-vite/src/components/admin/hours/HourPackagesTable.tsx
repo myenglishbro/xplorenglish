@@ -7,6 +7,7 @@ import { formatShortDateInLima } from "@/lib/datetime/lima";
 import { useCancelHoursPackage, useRefundHoursPackage } from "@/features/hoursAdmin/hooks";
 import type { AdminHourPackageListItem } from "@/server/admin/hours/types";
 import { PACKAGE_STATUS_LABEL, PACKAGE_STATUS_TONE } from "@/server/hours/types";
+import { RECEIPT_STATUS_LABEL, RECEIPT_STATUS_TONE, RECEIPT_STATUS_UNREGISTERED_LABEL } from "@/server/payments/types";
 
 /**
  * 100% solo lectura salvo cancelar/reembolsar (ciclo de vida de paquetes, versión reducida) --
@@ -43,6 +44,20 @@ export function HourPackagesTable({ packages }: { packages: AdminHourPackageList
           {PACKAGE_STATUS_LABEL[row.status]}
         </Tag>
       ),
+    },
+    {
+      key: "receiptStatus",
+      header: "Boleta",
+      render: (row) =>
+        row.receiptStatus === null ? (
+          <Tag tone="neutral" size="sm">
+            {RECEIPT_STATUS_UNREGISTERED_LABEL}
+          </Tag>
+        ) : (
+          <Tag tone={RECEIPT_STATUS_TONE[row.receiptStatus]} size="sm">
+            {RECEIPT_STATUS_LABEL[row.receiptStatus]}
+          </Tag>
+        ),
     },
     {
       key: "actions",

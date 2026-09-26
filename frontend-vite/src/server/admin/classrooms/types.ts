@@ -18,13 +18,18 @@ export interface ClassroomListItem {
   /** SUM(hours_movements.minutes_delta) del estudiante asignado (Slice G) -- null si el salón no
    * tiene estudiante. Nunca desde hours_packages.remaining_minutes. */
   studentBalance: number | null;
-  enabledTeacherCount: number;
+  /** Docentes con classroom_teachers.status = 'active' para este salón, orden alfabético por
+   * nombre completo (Slice F/FIX 4 -- sin PRIMARY/SUBSTITUTE, cualquier fila activa cuenta igual). */
+  teachers: TeacherMembership[];
 }
 
 export interface ClassroomListFilters {
   programId?: number;
   level?: AcademicLevel | "all";
   status?: ClassroomStatus | "all";
+  /** Búsqueda libre (FIX 10, segunda etapa) -- coincide contra classrooms.name o el nombre/apellido
+   * del estudiante asignado (classrooms.student_id -> profiles), nunca deducido de classrooms.name. */
+  search?: string;
 }
 
 /** Sin PRIMARY/SUBSTITUTE (Slice A) -- cualquier fila activa es un profesor habilitado. */

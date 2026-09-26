@@ -12,6 +12,9 @@ interface PackageRow {
   purchased_at: string;
   status: Database["public"]["Enums"]["package_status"];
   student: { first_name: string; last_name: string; dni: string } | null;
+  /** FIX 11 -- read-only acá, vía el FK ya existente hours_packages.payment_id. La edición vive
+   * exclusivamente en Admin > Pagos estudiantes (admin_set_receipt_status). */
+  payment: { receipt_status: Database["public"]["Enums"]["receipt_status"] | null } | null;
 }
 
 /**
@@ -28,7 +31,9 @@ interface PackageRow {
 export async function listHourPackagesForAdmin(supabase: Client): Promise<AdminHourPackageListItem[]> {
   const { data: packages, error } = await supabase
     .from("hours_packages")
-    .select("id, student_id, package_label, total_minutes, purchased_at, status, student:profiles!hours_packages_student_id_fkey(first_name,last_name,dni)")
+    .select(
+      "id, student_id, package_label, total_minutes, purchased_at, status, student:profiles!hours_packages_student_id_fkey(first_name,last_name,dni), payment:student_payments!hours_packages_payment_id_fkey(receipt_status)"
+    )
     .order("purchased_at", { ascending: false })
     .returns<PackageRow[]>();
 
@@ -65,6 +70,7 @@ export async function listHourPackagesForAdmin(supabase: Client): Promise<AdminH
     remainingMinutes: remainingByPackage.get(p.id) ?? 0,
     purchasedAt: p.purchased_at,
     status: p.status,
+    receiptStatus: p.payment?.receipt_status ?? null,
   }));
 }
 

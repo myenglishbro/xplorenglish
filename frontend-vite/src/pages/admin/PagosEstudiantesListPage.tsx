@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { useStudentPayments } from "@/features/paymentsAdmin/hooks";
 import { useAssignableStudents } from "@/features/classroomsAdmin/hooks";
-import type { PaymentStatus } from "@/server/payments/types";
+import type { PaymentStatus, ReceiptStatusFilter } from "@/server/payments/types";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { PaymentsFilterBar } from "@/components/admin/payments/PaymentsFilterBar";
@@ -9,15 +9,18 @@ import { PaymentsTable } from "@/components/admin/payments/PaymentsTable";
 import { CreateHourPackageButton } from "@/components/admin/payments/CreateHourPackageButton";
 
 const VALID_STATUSES: PaymentStatus[] = ["pending", "completed", "failed", "refunded"];
+const VALID_RECEIPT_STATUSES: ReceiptStatusFilter[] = ["pending", "issued", "sent", "not_applicable", "unregistered"];
 
 /** Portado de src/app/admin/pagos-estudiantes/page.tsx. */
 export function PagosEstudiantesListPage() {
   const [searchParams] = useSearchParams();
   const statusParam = searchParams.get("status");
   const status = VALID_STATUSES.includes(statusParam as PaymentStatus) ? (statusParam as PaymentStatus) : undefined;
+  const receiptStatusParam = searchParams.get("receiptStatus");
+  const receiptStatus = VALID_RECEIPT_STATUSES.includes(receiptStatusParam as ReceiptStatusFilter) ? (receiptStatusParam as ReceiptStatusFilter) : undefined;
   const studentId = searchParams.get("studentId") ?? undefined;
 
-  const paymentsQuery = useStudentPayments({ studentId, status });
+  const paymentsQuery = useStudentPayments({ studentId, status, receiptStatus });
   const studentsQuery = useAssignableStudents();
   const students = studentsQuery.data ?? [];
 

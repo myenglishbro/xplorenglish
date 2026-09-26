@@ -1,7 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { getMonthRangeInLima, type LimaDateRange } from "@/lib/datetime/lima";
-import type { FinancialReport, SalesDetailItem, TeacherCostDetailItem, ExpenseDetailItem, FinancialMonthlyTrendPoint } from "./types";
+import type {
+  FinancialReport,
+  SalesDetailItem,
+  TeacherCostDetailItem,
+  TeacherPaymentDetailItem,
+  TeacherPaymentClassItem,
+  ExpenseDetailItem,
+  FinancialMonthlyTrendPoint,
+} from "./types";
 
 type Client = SupabaseClient<Database>;
 
@@ -130,20 +138,107 @@ async function listTeacherCostForPeriod(
 }
 
 // ================================================================================================
-// Pago real a docentes (salida de caja) -- source of truth: teacher_payments (SUM(total_amount),
-// paid_at ∈ periodo). NUNCA class_records.occurred_at para decidir el mes del pago: una obligación
-// generada en septiembre puede pagarse en octubre, y debe contar como salida de caja de octubre.
+// Pagos reales a docentes (salida de caja) -- source of truth: teacher_payments, atribuido por
+// paid_at ∈ periodo (NUNCA class_records.occurred_at: una obligación generada en septiembre puede
+// pagarse en octubre, y debe contar como salida de caja de octubre). total_amount/total_minutes son
+// los valores OFICIALES del pago (teacher_payments), nunca recalculados sumando class_records --
+// classCount es el único dato derivado (FIX 5: conteo de class_records.teacher_payment_id = pago).
+// El KPI "Docentes pagados" usa el totalCents de esta misma función (nunca un segundo SUM aparte),
+// para que quede exactamente reconciliable con la lista de pagos del mismo periodo.
 // ================================================================================================
 
-async function sumPaidTeachers(supabase: Client, range: LimaDateRange): Promise<number> {
-  const { data, error } = await supabase
+interface TeacherPaymentRow {
+  id: number;
+  teacher_id: string;
+  paid_at: string;
+  total_minutes: number;
+  total_amount: number;
+  reference: string | null;
+}
+
+interface TeacherPaymentClassCountRow {
+  teacher_payment_id: number | null;
+}
+
+async function listTeacherPaymentsForPeriod(supabase: Client, range: LimaDateRange): Promise<{ items: TeacherPaymentDetailItem[]; totalCents: number }> {
+  const { data: payments, error } = await supabase
     .from("teacher_payments")
-    .select("total_amount, paid_at")
+    .select("id, teacher_id, paid_at, total_minutes, total_amount, reference")
     .gte("paid_at", range.start.toISOString())
-    .lt("paid_at", range.end.toISOString());
+    .lt("paid_at", range.end.toISOString())
+    .order("paid_at", { ascending: false })
+    .returns<TeacherPaymentRow[]>();
 
   if (error) throw error;
-  return data.reduce((cents, row) => cents + toCents(row.total_amount), 0);
+
+  const totalCents = payments.reduce((cents, row) => cents + toCents(row.total_amount), 0);
+  if (payments.length === 0) return { items: [], totalCents };
+
+  const paymentIds = payments.map((p) => p.id);
+  const [classCountRes, names] = await Promise.all([
+    supabase.from("class_records").select("teacher_payment_id").in("teacher_payment_id", paymentIds).returns<TeacherPaymentClassCountRow[]>(),
+    fetchTeacherNames(supabase, [...new Set(payments.map((p) => p.teacher_id))]),
+  ]);
+  if (classCountRes.error) throw classCountRes.error;
+
+  const classCountByPayment = new Map<number, number>();
+  for (const row of classCountRes.data) {
+    if (row.teacher_payment_id === null) continue;
+    classCountByPayment.set(row.teacher_payment_id, (classCountByPayment.get(row.teacher_payment_id) ?? 0) + 1);
+  }
+
+  const items: TeacherPaymentDetailItem[] = payments.map((p) => ({
+    id: p.id,
+    teacherId: p.teacher_id,
+    teacherName: names.get(p.teacher_id) ?? "—",
+    paidAt: p.paid_at,
+    classCount: classCountByPayment.get(p.id) ?? 0,
+    minutes: p.total_minutes,
+    totalAmount: p.total_amount,
+    reference: p.reference,
+  }));
+
+  return { items, totalCents };
+}
+
+/**
+ * Detalle de clases de UN teacher_payment (FIX 5) -- bajo demanda, solo cuando Administración abre
+ * un pago puntual (nunca precargado para toda la lista): 1 round-trip, con el alumno resuelto vía
+ * embed (mismo patrón que getTeacherPaymentStatement en server/payroll/queries.ts). hourlyRateSnapshot
+ * y amount son el valor histórico de cada class_record, NUNCA la tarifa actual del profesor.
+ */
+interface TeacherPaymentClassRow {
+  id: number;
+  occurred_at: string;
+  minutes: number;
+  hourly_rate_snapshot: number | null;
+  amount: number | null;
+  student: { first_name: string; last_name: string } | null;
+}
+
+export async function getTeacherPaymentClassDetail(supabase: Client, teacherPaymentId: number): Promise<TeacherPaymentClassItem[]> {
+  const { data, error } = await supabase
+    .from("class_records")
+    .select(
+      `
+      id, occurred_at, minutes, hourly_rate_snapshot, amount,
+      student:profiles!class_records_student_id_fkey(first_name, last_name)
+    `
+    )
+    .eq("teacher_payment_id", teacherPaymentId)
+    .order("occurred_at", { ascending: true })
+    .returns<TeacherPaymentClassRow[]>();
+
+  if (error) throw error;
+
+  return data.map((row) => ({
+    id: row.id,
+    occurredAt: row.occurred_at,
+    studentName: row.student ? `${row.student.first_name} ${row.student.last_name}` : "—",
+    minutes: row.minutes,
+    hourlyRateSnapshot: row.hourly_rate_snapshot,
+    amount: row.amount,
+  }));
 }
 
 // ================================================================================================
@@ -227,16 +322,17 @@ async function listExpensesForPeriod(supabase: Client, range: LimaDateRange): Pr
  * `pendingTeachers` es deuda ACTUAL (stock), a propósito independiente de `range`.
  */
 export async function getFinancialReport(supabase: Client, range: LimaDateRange): Promise<FinancialReport> {
-  const [salesResult, teacherCostResult, paidTeachersCents, expensesResult, pendingTeachersCents] = await Promise.all([
+  const [salesResult, teacherCostResult, teacherPaymentsResult, expensesResult, pendingTeachersCents] = await Promise.all([
     listSales(supabase, range),
     listTeacherCostForPeriod(supabase, range),
-    sumPaidTeachers(supabase, range),
+    listTeacherPaymentsForPeriod(supabase, range),
     listExpensesForPeriod(supabase, range),
     sumPendingTeacherDebt(supabase),
   ]);
 
   const collectedIncomeCents = salesResult.totalCents;
   const generatedTeacherCostCents = teacherCostResult.totalCents;
+  const paidTeachersCents = teacherPaymentsResult.totalCents;
   const otherExpensesCents = expensesResult.totalCents;
 
   const operatingResultCents = collectedIncomeCents - generatedTeacherCostCents - otherExpensesCents;
@@ -260,6 +356,7 @@ export async function getFinancialReport(supabase: Client, range: LimaDateRange)
     },
     sales: salesResult.items,
     teachers: teacherCostResult.items,
+    teacherPayments: teacherPaymentsResult.items,
     expenses: expensesResult.items,
   };
 }

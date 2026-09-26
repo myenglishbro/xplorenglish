@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
-import { getFinancialReport, getFinancialMonthlyTrend } from "@/server/reports/queries";
+import { getFinancialReport, getFinancialMonthlyTrend, getTeacherPaymentClassDetail } from "@/server/reports/queries";
 import type { LimaDateRange } from "@/lib/datetime/lima";
 
 /** La queryKey incluye startDate/endDate (no el objeto Date, que nunca es estable entre renders)
@@ -18,5 +18,15 @@ export function useFinancialMonthlyTrend(monthsBack = 6) {
   return useQuery({
     queryKey: queryKeys.adminFinancialTrend(monthsBack),
     queryFn: () => getFinancialMonthlyTrend(supabase, monthsBack),
+  });
+}
+
+/** Detalle de clases de UN pago docente (FIX 5) -- bajo demanda, solo mientras el modal de detalle
+ * está abierto (`enabled`), nunca precargado para toda la lista de pagos. */
+export function useTeacherPaymentClassDetail(teacherPaymentId: number | null) {
+  return useQuery({
+    queryKey: ["admin-teacher-payment-class-detail", teacherPaymentId] as const,
+    queryFn: () => getTeacherPaymentClassDetail(supabase, teacherPaymentId as number),
+    enabled: teacherPaymentId !== null,
   });
 }

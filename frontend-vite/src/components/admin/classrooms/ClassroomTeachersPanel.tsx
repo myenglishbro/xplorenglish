@@ -31,14 +31,15 @@ export function ClassroomTeachersPanel({ classroomId, teachers, assignableTeache
 
   const enabledIds = new Set(teachers.map((t) => t.teacherId));
   const rawCandidates = assignableTeachers.filter((t) => !enabledIds.has(t.id));
-  const recommendation = useTeacherAvailabilityAndSkillsForIds(rawCandidates.map((t) => t.id));
+  const recommendation = useTeacherAvailabilityAndSkillsForIds(rawCandidates.map((t) => t.id), classroomId);
 
   const candidates = rankTeachersForClassroom(
     rawCandidates,
     activeSchedules,
     recommendation.data?.availabilityByTeacher ?? new Map(),
     recommendation.data?.skillsByTeacher ?? new Map(),
-    classroomLevel
+    classroomLevel,
+    recommendation.data?.occupiedByTeacher ?? new Map()
   );
   const options = candidates.map((t) => ({
     value: t.id,

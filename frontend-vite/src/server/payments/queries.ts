@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { paymentProofExists } from "@/lib/storage/paymentProofs";
-import type { HoursMovementItem, PaymentDetail, PaymentListFilters, PaymentListItem } from "./types";
+import type { HoursMovementItem, PaymentDetail, PaymentListFilters, PaymentListItem, ReceiptStatus } from "./types";
 
 type Client = SupabaseClient<Database>;
 
@@ -12,6 +12,7 @@ interface PaymentListRow {
   currency: string;
   payment_method: string;
   status: Database["public"]["Enums"]["payment_status"];
+  receipt_status: Database["public"]["Enums"]["receipt_status"] | null;
   paid_at: string | null;
   created_at: string;
   student: { first_name: string; last_name: string } | null;
@@ -22,14 +23,16 @@ interface PaymentListRow {
  * Vista admin -- RLS (student_payments_select_own, 0007) ya permite a un admin ver todas las
  * filas, no solo las propias. `hours_packages` se embebe como arreglo porque no hay un UNIQUE en
  * `payment_id` a nivel de DB (el 1:1 lo garantiza hoy create_hour_package por construcción, no un
- * constraint) -- se toma el primero, defensivamente.
+ * constraint) -- se toma el primero, defensivamente. `receiptStatus` (FIX 11) es documental, nunca
+ * financiero -- filtros.receiptStatus === "unregistered" filtra explícitamente IS NULL, distinto de
+ * "sin filtro" (undefined): un truthy-check simple haría imposible filtrar por NULL.
  */
 export async function listStudentPayments(supabase: Client, filters: PaymentListFilters = {}): Promise<PaymentListItem[]> {
   let query = supabase
     .from("student_payments")
     .select(
       `
-      id, student_id, amount, currency, payment_method, status, paid_at, created_at,
+      id, student_id, amount, currency, payment_method, status, receipt_status, paid_at, created_at,
       student:profiles!student_payments_student_id_fkey(first_name,last_name),
       hours_packages(id, package_label, total_minutes, status)
     `
@@ -38,6 +41,11 @@ export async function listStudentPayments(supabase: Client, filters: PaymentList
 
   if (filters.studentId) query = query.eq("student_id", filters.studentId);
   if (filters.status) query = query.eq("status", filters.status);
+  if (filters.receiptStatus === "unregistered") {
+    query = query.is("receipt_status", null);
+  } else if (filters.receiptStatus) {
+    query = query.eq("receipt_status", filters.receiptStatus);
+  }
 
   const { data, error } = await query.returns<PaymentListRow[]>();
   if (error) throw error;
@@ -52,6 +60,7 @@ export async function listStudentPayments(supabase: Client, filters: PaymentList
       currency: row.currency,
       paymentMethod: row.payment_method,
       status: row.status,
+      receiptStatus: row.receipt_status,
       paidAt: row.paid_at,
       createdAt: row.created_at,
       packageId: pkg?.id ?? null,
@@ -69,6 +78,7 @@ interface PaymentDetailRow {
   currency: string;
   payment_method: string;
   status: Database["public"]["Enums"]["payment_status"];
+  receipt_status: Database["public"]["Enums"]["receipt_status"] | null;
   reference: string | null;
   paid_at: string | null;
   created_at: string;
@@ -98,7 +108,7 @@ export async function getPaymentDetail(supabase: Client, paymentId: number): Pro
     .from("student_payments")
     .select(
       `
-      id, student_id, amount, currency, payment_method, status, reference, paid_at, created_at,
+      id, student_id, amount, currency, payment_method, status, receipt_status, reference, paid_at, created_at,
       student:profiles!student_payments_student_id_fkey(first_name,last_name),
       hours_packages(id, package_label, total_minutes, price_paid, purchased_at, expires_at, status)
     `
@@ -158,6 +168,7 @@ export async function getPaymentDetail(supabase: Client, paymentId: number): Pro
     currency: paymentRow.currency,
     paymentMethod: paymentRow.payment_method,
     status: paymentRow.status,
+    receiptStatus: paymentRow.receipt_status,
     reference: paymentRow.reference,
     paidAt: paymentRow.paid_at,
     createdAt: paymentRow.created_at,
@@ -176,4 +187,32 @@ export async function getPaymentDetail(supabase: Client, paymentId: number): Pro
     ledger,
     hasProof,
   };
+}
+
+const RECEIPT_STATUS_RPC_ERROR_MESSAGES: Record<string, string> = {
+  UNAUTHENTICATED: "Tu sesión expiró. Vuelve a iniciar sesión.",
+  NOT_AUTHORIZED: "Esta operación es exclusiva para administradores.",
+  PAYMENT_NOT_FOUND: "Este pago ya no existe. Actualiza la página e inténtalo de nuevo.",
+};
+
+function parseReceiptStatusRpcError(error: { message: string }): Error {
+  const code = error.message.split(":")[0]?.trim() ?? "";
+  return new Error(RECEIPT_STATUS_RPC_ERROR_MESSAGES[code] ?? "No pudimos actualizar el estado de la boleta. Inténtalo de nuevo en unos minutos.");
+}
+
+/**
+ * Único punto de escritura de receipt_status después de la compra inicial (FIX 11) -- RPC
+ * SECURITY DEFINER admin-only y auditado (admin_set_receipt_status, 0042). NUNCA toca
+ * student_payments.status, amount, paid_at, hours_packages ni hours_movements -- exclusivamente la
+ * dimensión documental. Nunca acepta null: una vez clasificado, el Admin solo puede moverse entre
+ * los 4 valores del enum, no volver a "Sin registrar".
+ */
+export async function setReceiptStatus(supabase: Client, paymentId: number, status: ReceiptStatus, reason?: string): Promise<void> {
+  const { error } = await supabase.rpc("admin_set_receipt_status", {
+    p_payment_id: paymentId,
+    p_status: status,
+    p_reason: reason ?? undefined,
+  });
+
+  if (error) throw parseReceiptStatusRpcError(error);
 }

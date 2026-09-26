@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
-import { listStudentPayments, getPaymentDetail } from "@/server/payments/queries";
+import { listStudentPayments, getPaymentDetail, setReceiptStatus } from "@/server/payments/queries";
 import { createHourPackageSchema, type CreateHourPackageInput } from "@/server/payments/validation";
-import type { PaymentListFilters, CreateHourPackageResult } from "@/server/payments/types";
+import type { PaymentListFilters, CreateHourPackageResult, ReceiptStatus } from "@/server/payments/types";
 
 export function useStudentPayments(filters: PaymentListFilters) {
   return useQuery({
-    queryKey: queryKeys.adminStudentPayments({ studentId: filters.studentId, status: filters.status }),
+    queryKey: queryKeys.adminStudentPayments({ studentId: filters.studentId, status: filters.status, receiptStatus: filters.receiptStatus }),
     queryFn: () => listStudentPayments(supabase, filters),
   });
 }
@@ -81,6 +81,24 @@ export function useCreateHourPackage() {
       queryClient.invalidateQueries({ queryKey: ["student-balance-alerts"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.studentBalance(variables.studentId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.hoursPackages(variables.studentId) });
+    },
+  });
+}
+
+/**
+ * Único punto de escritura de receipt_status después de la compra (FIX 11) -- llama exclusivamente
+ * al RPC auditado admin_set_receipt_status, nunca un UPDATE directo a student_payments. Invalida
+ * SOLO lo que realmente contiene receiptStatus: el listado de pagos y el detalle de ESE pago --
+ * nunca horas/saldos/reportes, porque este dato es documental, no financiero.
+ */
+export function useSetReceiptStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paymentId, status, reason }: { paymentId: number; status: ReceiptStatus; reason?: string }) =>
+      setReceiptStatus(supabase, paymentId, status, reason),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-student-payments"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPaymentDetail(variables.paymentId) });
     },
   });
 }

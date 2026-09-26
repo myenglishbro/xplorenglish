@@ -21,7 +21,23 @@ export function ClassroomsTable({ items }: { items: ClassroomListItem[] }) {
       header: "Estudiante",
       render: (row) => row.studentName ?? <span style={{ color: "var(--text-muted)" }}>Sin asignar</span>,
     },
-    { key: "enabledTeacherCount", header: "Profesores", align: "center" },
+    {
+      key: "teachers",
+      header: "Docente(s)",
+      render: (row) => {
+        if (row.teachers.length === 0) return <span style={{ color: "var(--text-muted)" }}>Sin asignar</span>;
+        const names = row.teachers.map((t) => `${t.firstName} ${t.lastName}`);
+        const label = names.length === 1 ? names[0] : `${names[0]} +${names.length - 1} más`;
+        return (
+          <span
+            title={names.length > 1 ? names.join("\n") : undefined}
+            style={{ display: "inline-block", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {label}
+          </span>
+        );
+      },
+    },
     {
       key: "studentBalance",
       header: "Saldo",

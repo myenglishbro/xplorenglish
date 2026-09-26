@@ -10,6 +10,7 @@ import { ReportKpis } from "@/components/admin/reports/ReportKpis";
 import { ReportTrendChart } from "@/components/admin/reports/ReportTrendChart";
 import { SalesTable } from "@/components/admin/reports/SalesTable";
 import { TeacherCostTable } from "@/components/admin/reports/TeacherCostTable";
+import { TeacherPaymentsTable } from "@/components/admin/reports/TeacherPaymentsTable";
 import { ExpensesSection } from "@/components/admin/expenses/ExpensesSection";
 
 type ReportTab = "sales" | "teachers" | "expenses";
@@ -88,11 +89,23 @@ export function ReportesPage() {
 
             {activeTab === "sales" && <SalesTable items={reportQuery.data.sales} />}
             {activeTab === "teachers" && (
-              <TeacherCostTable
-                items={reportQuery.data.teachers}
-                generatedInPeriod={reportQuery.data.kpis.generatedTeacherCost}
-                pendingTotal={reportQuery.data.kpis.pendingTeachers}
-              />
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+                <TeacherCostTable
+                  items={reportQuery.data.teachers}
+                  generatedInPeriod={reportQuery.data.kpis.generatedTeacherCost}
+                  pendingTotal={reportQuery.data.kpis.pendingTeachers}
+                />
+
+                <div>
+                  <h3 style={{ margin: "0 0 4px", font: "var(--weight-bold) var(--text-h4-size)/var(--text-h4-lh) var(--font-display)", color: "var(--text-heading)" }}>
+                    Pagos realizados a docentes
+                  </h3>
+                  <p style={{ margin: "0 0 var(--space-3)", color: "var(--text-muted)" }}>
+                    Dinero que efectivamente ya se pagó a profesores en este periodo -- distinto del costo docente generado de arriba.
+                  </p>
+                  <TeacherPaymentsTable items={reportQuery.data.teacherPayments} />
+                </div>
+              </div>
             )}
             {activeTab === "expenses" && <ExpensesSection />}
           </div>

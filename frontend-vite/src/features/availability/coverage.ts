@@ -25,3 +25,20 @@ export function coversInterval(
   }
   return false;
 }
+
+interface TimeBlock {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+/** Intersección de intervalos (no cobertura total): cualquier solape, por parcial que sea,
+ * cuenta -- a diferencia de coversInterval, que exige cubrir el bloque completo. */
+export function findOverlapping<T extends TimeBlock>(blocks: T[], dayOfWeek: number, start: number, end: number): T[] {
+  return blocks.filter((block) => {
+    if (block.dayOfWeek !== dayOfWeek) return false;
+    const blockStart = timeToMinutes(block.startTime);
+    const blockEnd = timeToMinutes(block.endTime);
+    return blockStart < end && blockEnd > start;
+  });
+}

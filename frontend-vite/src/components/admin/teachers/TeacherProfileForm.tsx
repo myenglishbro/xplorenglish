@@ -13,6 +13,9 @@ export interface TeacherProfileFormProps {
   hourlyRate: number;
   bio: string | null;
   status: TeacherProfileStatus;
+  /** teacher_profiles.receipt_drive_url (FIX 2, segunda etapa) -- carpeta de Google Drive donde el
+   * docente sube sus recibos por honorarios. Xplore solo guarda y abre esta URL. */
+  receiptDriveUrl: string | null;
 }
 
 const STATUS_OPTIONS = [
@@ -25,11 +28,12 @@ const STATUS_OPTIONS = [
  * classroom_teachers. Para cambiar asignaciones de salón, el admin sigue yendo a
  * /admin/salones/:id (no se duplica esa UI acá).
  */
-export function TeacherProfileForm({ profileId, hourlyRate, bio, status }: TeacherProfileFormProps) {
+export function TeacherProfileForm({ profileId, hourlyRate, bio, status, receiptDriveUrl }: TeacherProfileFormProps) {
   const mutation = useUpdateTeacherProfile(profileId);
   const [fieldErrors, setFieldErrors] = React.useState<UpdateTeacherProfileFieldErrors>({});
   const [saved, setSaved] = React.useState(false);
   const [statusValue, setStatusValue] = React.useState<string>(status);
+  const [receiptDriveUrlValue, setReceiptDriveUrlValue] = React.useState<string>(receiptDriveUrl ?? "");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,6 +46,7 @@ export function TeacherProfileForm({ profileId, hourlyRate, bio, status }: Teach
         hourlyRate: formData.get("hourlyRate"),
         bio: formData.get("bio"),
         status: statusValue,
+        receiptDriveUrl: formData.get("receiptDriveUrl"),
       });
       setSaved(true);
     } catch (err) {
@@ -67,6 +72,34 @@ export function TeacherProfileForm({ profileId, hourlyRate, bio, status }: Teach
 
       <Field label="Bio" htmlFor="bio" error={fieldErrors.bio}>
         <Textarea id="bio" name="bio" rows={3} defaultValue={bio ?? ""} disabled={mutation.isPending} />
+      </Field>
+
+      <Field
+        label="Carpeta de recibos por honorarios (Google Drive)"
+        htmlFor="receiptDriveUrl"
+        error={fieldErrors.receiptDriveUrl}
+        hint="Enlace a la carpeta de Google Drive donde el docente subirá sus recibos por honorarios."
+      >
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ flex: 1 }}>
+            <Input
+              id="receiptDriveUrl"
+              name="receiptDriveUrl"
+              type="url"
+              placeholder="https://drive.google.com/drive/folders/…"
+              value={receiptDriveUrlValue}
+              onChange={(e) => setReceiptDriveUrlValue(e.target.value)}
+              disabled={mutation.isPending}
+            />
+          </div>
+          {receiptDriveUrlValue.trim().length > 0 && (
+            <a href={receiptDriveUrlValue.trim()} target="_blank" rel="noopener noreferrer">
+              <Button type="button" variant="ghost" size="sm">
+                Abrir carpeta
+              </Button>
+            </a>
+          )}
+        </div>
       </Field>
 
       <div>

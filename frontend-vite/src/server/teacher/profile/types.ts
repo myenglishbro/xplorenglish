@@ -2,6 +2,10 @@ export interface MyTeacherProfileSummary {
   bio: string | null;
   hourlyRate: number;
   status: string;
+  /** teacher_profiles.receipt_drive_url (FIX 2, segunda etapa) -- carpeta de Google Drive para
+   * recibos por honorarios; null si Admin todavía no la configuró. Solo lectura para el docente:
+   * teacher_profiles no tiene policy de UPDATE para no-admin (0003). */
+  receiptDriveUrl: string | null;
 }
 
 export interface MyTeacherProfile {

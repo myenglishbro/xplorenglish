@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-import type { AvailabilityBlockItem } from "@/features/availability/types";
+import type { AvailabilityBlockItem, OccupiedBlockItem } from "@/features/availability/types";
 import type { TeacherListItem, TeacherProfileStatus } from "./types";
 
 type Client = SupabaseClient<Database>;
@@ -121,6 +121,80 @@ export async function getAllTeacherAvailabilityByIds(
       map.set(row.teacher_id, list);
     }
     if (data.length < pageSize) break;
+  }
+  return map;
+}
+
+interface OccupiedScheduleRow {
+  classroom_id: number;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  classroom: { student_id: string | null } | null;
+}
+
+/**
+ * Ocupación real de un lote de docentes -- DERIVADA de sus asignaciones activas a salones
+ * (classroom_teachers) y el horario recurrente de esos salones (class_schedules), NUNCA
+ * almacenada en teacher_availability (FIX 2, segunda etapa). Mismo criterio de "vigente" que
+ * la Agenda semanal del dashboard (getWeeklyAgenda): classroom_teachers.status = active,
+ * classrooms.status = active, class_schedules.is_active = true. 3 round-trips fijos
+ * (asignaciones -> horarios -> nombres de alumno), nunca uno por docente/salón.
+ *
+ * `excludeClassroomId` (FIX 2B -- recomendación de docentes al editar un salón) descarta los
+ * horarios de ESE salón: evita que edición de un salón existente haga aparecer como "ocupado
+ * consigo mismo" a un profesor ya habilitado en él.
+ */
+export async function getTeacherOccupiedBlocksByIds(
+  supabase: Client,
+  teacherIds: string[],
+  excludeClassroomId?: number
+): Promise<Map<string, OccupiedBlockItem[]>> {
+  const map = new Map<string, OccupiedBlockItem[]>();
+  if (teacherIds.length === 0) return map;
+
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from("classroom_teachers")
+    .select("classroom_id, teacher_id")
+    .eq("status", "active")
+    .in("teacher_id", teacherIds);
+  if (assignmentsError) throw assignmentsError;
+  if (assignments.length === 0) return map;
+
+  const classroomIds = [...new Set(assignments.map((a) => a.classroom_id))].filter((id) => id !== excludeClassroomId);
+  if (classroomIds.length === 0) return map;
+  const teacherIdsByClassroom = new Map<number, string[]>();
+  for (const a of assignments) {
+    const list = teacherIdsByClassroom.get(a.classroom_id) ?? [];
+    list.push(a.teacher_id);
+    teacherIdsByClassroom.set(a.classroom_id, list);
+  }
+
+  const { data: schedules, error: schedulesError } = await supabase
+    .from("class_schedules")
+    .select("classroom_id, day_of_week, start_time, end_time, classroom:classrooms!inner(student_id)")
+    .eq("is_active", true)
+    .eq("classrooms.status", "active")
+    .in("classroom_id", classroomIds)
+    .returns<OccupiedScheduleRow[]>();
+  if (schedulesError) throw schedulesError;
+  if (schedules.length === 0) return map;
+
+  const studentIds = [...new Set(schedules.map((s) => s.classroom?.student_id).filter((id): id is string => !!id))];
+  const studentNames = new Map<string, string>();
+  if (studentIds.length > 0) {
+    const { data: students, error: studentsError } = await supabase.from("profiles").select("id, first_name, last_name").in("id", studentIds);
+    if (studentsError) throw studentsError;
+    for (const s of students) studentNames.set(s.id, `${s.first_name} ${s.last_name}`);
+  }
+
+  for (const row of schedules) {
+    const studentName = row.classroom?.student_id ? (studentNames.get(row.classroom.student_id) ?? "—") : "—";
+    for (const teacherId of teacherIdsByClassroom.get(row.classroom_id) ?? []) {
+      const list = map.get(teacherId) ?? [];
+      list.push({ classroomId: row.classroom_id, dayOfWeek: row.day_of_week, startTime: row.start_time, endTime: row.end_time, studentName });
+      map.set(teacherId, list);
+    }
   }
   return map;
 }

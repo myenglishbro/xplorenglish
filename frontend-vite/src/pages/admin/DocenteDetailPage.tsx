@@ -89,6 +89,7 @@ export function DocenteDetailPage() {
             hourlyRate={teacherProfile.hourlyRate}
             bio={teacherProfile.bio}
             status={teacherProfile.status === "inactive" ? "inactive" : "active"}
+            receiptDriveUrl={teacherProfile.receiptDriveUrl}
           />
         </Card>
 

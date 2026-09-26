@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
-import { getTeacherPaymentSummaries, getTeacherName, getTeacherPaymentStatement, payTeacherClasses } from "@/server/payroll/queries";
+import { getTeacherPaymentSummaries, getTeacherPayrollHeader, getTeacherPaymentStatement, payTeacherClasses } from "@/server/payroll/queries";
 
 /** Listado principal Admin -> Pagos a profesores (Slice E). */
 export function useTeacherPaymentSummaries() {
@@ -11,10 +11,11 @@ export function useTeacherPaymentSummaries() {
   });
 }
 
-export function useTeacherName(teacherId: string | undefined) {
+/** Nombre + carpeta de recibos por honorarios (Drive) del profesor -- FIX 2, segunda etapa. */
+export function useTeacherPayrollHeader(teacherId: string | undefined) {
   return useQuery({
-    queryKey: ["admin-teacher-name", teacherId],
-    queryFn: () => getTeacherName(supabase, teacherId!),
+    queryKey: ["admin-teacher-payroll-header", teacherId],
+    queryFn: () => getTeacherPayrollHeader(supabase, teacherId!),
     enabled: !!teacherId,
   });
 }

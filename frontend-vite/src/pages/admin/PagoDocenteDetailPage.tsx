@@ -1,10 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 import { Icon } from "@/components/ui/core/Icon";
+import { Button } from "@/components/ui/core/Button";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { Alert } from "@/components/ui/feedback/Alert";
 import { TeacherPaymentStatement } from "@/components/admin/payroll/TeacherPaymentStatement";
-import { useTeacherName, useTeacherPaymentStatement } from "@/features/payrollAdmin/hooks";
+import { useTeacherPayrollHeader, useTeacherPaymentStatement } from "@/features/payrollAdmin/hooks";
 
 /**
  * Estado de cuenta de un profesor (Slice E). Reemplaza el detalle de "periodo de pago" viejo --
@@ -12,7 +13,7 @@ import { useTeacherName, useTeacherPaymentStatement } from "@/features/payrollAd
  */
 export function PagoDocenteDetailPage() {
   const { id: teacherId } = useParams<{ id: string }>();
-  const nameQuery = useTeacherName(teacherId);
+  const headerQuery = useTeacherPayrollHeader(teacherId);
   const statementQuery = useTeacherPaymentStatement(teacherId);
 
   if (!teacherId) {
@@ -32,16 +33,31 @@ export function PagoDocenteDetailPage() {
         >
           <Icon name="arrow-left" size={14} /> Volver a Pagos a profesores
         </Link>
-        <h1
-          style={{
-            marginTop: 8,
-            font: "var(--weight-bold) var(--text-h2-size)/var(--text-h2-lh) var(--font-display)",
-            letterSpacing: "var(--text-h2-ls)",
-            color: "var(--text-heading)",
-          }}
-        >
-          {nameQuery.data ?? "…"}
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
+          <h1
+            style={{
+              font: "var(--weight-bold) var(--text-h2-size)/var(--text-h2-lh) var(--font-display)",
+              letterSpacing: "var(--text-h2-ls)",
+              color: "var(--text-heading)",
+              margin: 0,
+            }}
+          >
+            {headerQuery.data?.name ?? "…"}
+          </h1>
+          {headerQuery.data && (
+            headerQuery.data.receiptDriveUrl ? (
+              <a href={headerQuery.data.receiptDriveUrl} target="_blank" rel="noopener noreferrer">
+                <Button type="button" variant="secondary" size="sm" icon="folder-open">
+                  Ver recibos
+                </Button>
+              </a>
+            ) : (
+              <span style={{ font: "var(--weight-regular) 13px/1 var(--font-body)", color: "var(--text-muted)" }}>
+                Sin carpeta de recibos configurada
+              </span>
+            )
+          )}
+        </div>
       </div>
 
       {statementQuery.isLoading ? (

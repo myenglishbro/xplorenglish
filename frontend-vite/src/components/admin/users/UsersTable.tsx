@@ -3,6 +3,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/surfaces/DataTa
 import { Tag } from "@/components/ui/core/Tag";
 import { Icon } from "@/components/ui/core/Icon";
 import { formatShortDateInLima } from "@/lib/datetime/lima";
+import { formatMinutesAsHours } from "@/lib/format/minutes";
 import type { AccessStatus, UserListItem, UserRole } from "@/server/admin/users/types";
 
 const ROLE_LABEL: Record<UserRole, string> = { admin: "Admin", teacher: "Docente", student: "Estudiante" };
@@ -38,6 +39,19 @@ function ClassroomCell({ row, navigate }: { row: UserListItem; navigate: ReturnT
     >
       {row.classroom.name}
     </button>
+  );
+}
+
+/** Horas compradas (histórico, nunca el saldo) + saldo actual -- FIX 9, segunda etapa. Ambas
+ * cifras se muestran siempre juntas para no confundir "lo que compró" con "lo que le queda". */
+function HoursCell({ row }: { row: UserListItem }) {
+  if (row.hoursPurchasedMinutes === null || row.hoursBalanceMinutes === null) return <span style={{ color: "var(--text-muted)" }}>—</span>;
+  if (row.hoursPurchasedMinutes === 0) return <span style={{ color: "var(--text-muted)" }}>Sin compras</span>;
+  return (
+    <span style={{ display: "flex", flexDirection: "column", gap: 1, fontSize: "var(--text-caption-size)" }}>
+      <span style={{ color: "var(--text-heading)" }}>{formatMinutesAsHours(row.hoursPurchasedMinutes)} compradas</span>
+      <span style={{ color: "var(--text-muted)" }}>{formatMinutesAsHours(row.hoursBalanceMinutes)} disponibles</span>
+    </span>
   );
 }
 
@@ -117,6 +131,11 @@ export function UsersTable({ items, mode }: UsersTableProps) {
       key: "classroom",
       header: "Salón",
       render: (row) => <ClassroomCell row={row} navigate={navigate} />,
+    },
+    {
+      key: "hours",
+      header: "Horas",
+      render: (row) => <HoursCell row={row} />,
     },
     {
       key: "accessStatus",

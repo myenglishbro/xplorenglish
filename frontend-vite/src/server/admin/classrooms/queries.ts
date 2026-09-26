@@ -37,14 +37,14 @@ interface ClassroomListRow {
   student_id: string | null;
   program: { name: string } | null;
   student: { first_name: string; last_name: string } | null;
-  classroom_teachers: { status: MembershipStatus }[];
+  classroom_teachers: { teacher_id: string; status: MembershipStatus }[];
 }
 
 const LIST_SELECT = `
   id, name, level, status, program_id, student_id,
   program:programs(name),
   student:profiles!classrooms_student_id_fkey(first_name, last_name),
-  classroom_teachers(status)
+  classroom_teachers(teacher_id, status)
 `;
 
 /**
@@ -65,6 +65,27 @@ async function fetchStudentBalances(supabase: Client, studentIds: string[]): Pro
   return balances;
 }
 
+/**
+ * Ids de estudiantes cuyo first_name/last_name coincide con la búsqueda (FIX 10) -- por palabra:
+ * cada palabra del término debe aparecer en first_name O last_name (AND entre palabras, OR entre
+ * columnas por palabra), así "Vivian Florian" exige ambas palabras presentes sin depender de una
+ * columna de nombre completo que no existe. Nunca se deduce el alumno desde classrooms.name.
+ */
+async function findStudentIdsMatchingSearch(supabase: Client, term: string): Promise<string[]> {
+  const words = term.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+
+  let query = supabase.from("profiles").select("id").eq("role", "student");
+  for (const word of words) {
+    const pattern = `%${word}%`;
+    query = query.or(`first_name.ilike.${pattern},last_name.ilike.${pattern}`);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data.map((r) => r.id);
+}
+
 export async function listClassrooms(supabase: Client, filters: ClassroomListFilters): Promise<ClassroomListItem[]> {
   let query = supabase.from("classrooms").select(LIST_SELECT).order("name", { ascending: true });
 
@@ -72,23 +93,53 @@ export async function listClassrooms(supabase: Client, filters: ClassroomListFil
   if (filters.level && filters.level !== "all") query = query.eq("level", filters.level);
   if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
 
+  const term = filters.search?.trim() ?? "";
+  if (term) {
+    const pattern = `%${term}%`;
+    // 1 query extra (acotada a profiles, nunca por salón) para resolver el estudiante REAL vía
+    // classrooms.student_id -- nunca se infiere del nombre del salón. Sobre ESE resultado (todo el
+    // dataset que cumple programa/nivel/estado, no solo la página visible -- Salones no tiene
+    // paginación server-side hoy) se aplica el OR nombre-de-salón / alumno-coincidente.
+    const matchedStudentIds = await findStudentIdsMatchingSearch(supabase, term);
+    query =
+      matchedStudentIds.length > 0
+        ? query.or(`name.ilike.${pattern},student_id.in.(${matchedStudentIds.join(",")})`)
+        : query.ilike("name", pattern);
+  }
+
   const { data, error } = await query.returns<ClassroomListRow[]>();
   if (error) throw error;
 
   const studentIds = [...new Set(data.map((r) => r.student_id).filter((id): id is string => id !== null))];
-  const balances = await fetchStudentBalances(supabase, studentIds);
+  const activeTeacherIds = [...new Set(data.flatMap((r) => r.classroom_teachers.filter((t) => t.status === "active").map((t) => t.teacher_id)))];
+  const [balances, teacherNames] = await Promise.all([
+    fetchStudentBalances(supabase, studentIds),
+    fetchProfileNames(supabase, activeTeacherIds),
+  ]);
 
-  return data.map((row) => ({
-    id: row.id,
-    name: row.name,
-    programId: row.program_id,
-    programName: row.program?.name ?? "—",
-    level: row.level,
-    status: row.status as ClassroomStatus,
-    studentName: row.student ? `${row.student.first_name} ${row.student.last_name}` : null,
-    studentBalance: row.student_id ? (balances.get(row.student_id) ?? 0) : null,
-    enabledTeacherCount: row.classroom_teachers.filter((t) => t.status === "active").length,
-  }));
+  return data.map((row) => {
+    const teachers: TeacherMembership[] = row.classroom_teachers
+      .filter((t) => t.status === "active")
+      .map((t) => {
+        const name = teacherNames.get(t.teacher_id);
+        if (!name) return null;
+        return { teacherId: t.teacher_id, firstName: name.firstName, lastName: name.lastName };
+      })
+      .filter((t): t is TeacherMembership => !!t)
+      .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+
+    return {
+      id: row.id,
+      name: row.name,
+      programId: row.program_id,
+      programName: row.program?.name ?? "—",
+      level: row.level,
+      status: row.status as ClassroomStatus,
+      studentName: row.student ? `${row.student.first_name} ${row.student.last_name}` : null,
+      studentBalance: row.student_id ? (balances.get(row.student_id) ?? 0) : null,
+      teachers,
+    };
+  });
 }
 
 interface ClassroomDetailRow {

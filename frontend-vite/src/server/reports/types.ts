@@ -17,7 +17,9 @@ export interface FinancialReportKpis {
    * pagado al profesor -- es una obligación generada, no una salida de caja. */
   generatedTeacherCost: number;
   /** "Docentes pagados": SUM(teacher_payments.total_amount) WHERE paid_at ∈ periodo. Salida de caja
-   * real -- puede diferir de generatedTeacherCost del mismo periodo, y eso es correcto. */
+   * real -- puede diferir de generatedTeacherCost del mismo periodo, y eso es correcto. Exactamente
+   * reconciliable con SUM(FinancialReport.teacherPayments[].totalAmount) del mismo periodo (FIX 5,
+   * misma fuente/mismo filtro -- nunca dos cálculos separados). */
   paidTeachers: number;
   /** "Deuda docente actual": SUM(class_records.amount) WHERE status IN ('present','absent') AND
    * amount IS NOT NULL AND teacher_payment_id IS NULL, SIEMPRE a la fecha actual -- nunca una
@@ -52,6 +54,36 @@ export interface TeacherCostDetailItem {
   amount: number;
 }
 
+/** Un pago REAL a un docente (FIX 5) -- fuente de verdad: teacher_payments, atribuido por
+ * paid_at (nunca class_records.occurred_at). totalAmount/minutes son los valores oficiales
+ * almacenados en el propio pago (teacher_payments.total_amount/total_minutes), NUNCA
+ * recalculados sumando class_records -- classCount es el único dato derivado (conteo de
+ * class_records.teacher_payment_id = este pago). */
+export interface TeacherPaymentDetailItem {
+  [key: string]: unknown;
+  id: number;
+  teacherId: string;
+  teacherName: string;
+  paidAt: string;
+  classCount: number;
+  minutes: number;
+  totalAmount: number;
+  reference: string | null;
+}
+
+/** Una clase incluida en un teacher_payment (detalle expandible de TeacherPaymentDetailItem).
+ * hourlyRateSnapshot/amount son el valor histórico de ESA clase (class_records), nunca la
+ * tarifa actual del profesor. */
+export interface TeacherPaymentClassItem {
+  [key: string]: unknown;
+  id: number;
+  occurredAt: string;
+  studentName: string;
+  minutes: number;
+  hourlyRateSnapshot: number | null;
+  amount: number | null;
+}
+
 export interface ExpenseDetailItem {
   [key: string]: unknown;
   id: number;
@@ -67,6 +99,10 @@ export interface FinancialReport {
   kpis: FinancialReportKpis;
   sales: SalesDetailItem[];
   teachers: TeacherCostDetailItem[];
+  /** Pagos reales realizados a docentes en el periodo (FIX 5) -- distinto de `teachers` (costo
+   * GENERADO, atribuido por occurred_at). El detalle de clases de cada pago se pide aparte, bajo
+   * demanda, cuando Administración abre un pago (ver getTeacherPaymentClassDetail). */
+  teacherPayments: TeacherPaymentDetailItem[];
   expenses: ExpenseDetailItem[];
 }
 

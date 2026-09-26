@@ -9,6 +9,18 @@ const STATUS_OPTIONS = [
   { value: "refunded", label: "Reembolsado" },
 ];
 
+/** Estado de BOLETA (FIX 11) -- dimensión documental, independiente del estado del pago de arriba.
+ * "unregistered" filtra explícitamente receipt_status IS NULL ("Sin registrar"), distinto de "all"
+ * (sin filtro). */
+const RECEIPT_STATUS_OPTIONS = [
+  { value: "all", label: "Boleta: todas" },
+  { value: "pending", label: "Pendiente" },
+  { value: "issued", label: "Emitida" },
+  { value: "sent", label: "Enviada" },
+  { value: "not_applicable", label: "No aplica" },
+  { value: "unregistered", label: "Sin registrar" },
+];
+
 export interface PaymentsFilterBarProps {
   students: { id: string; firstName: string; lastName: string }[];
 }
@@ -38,6 +50,13 @@ export function PaymentsFilterBar({ students }: PaymentsFilterBarProps) {
       </div>
       <div style={{ width: 200 }}>
         <Select value={searchParams.get("status") ?? "all"} options={STATUS_OPTIONS} onChange={(e) => applyParams({ status: e.target.value })} />
+      </div>
+      <div style={{ width: 200 }}>
+        <Select
+          value={searchParams.get("receiptStatus") ?? "all"}
+          options={RECEIPT_STATUS_OPTIONS}
+          onChange={(e) => applyParams({ receiptStatus: e.target.value })}
+        />
       </div>
     </div>
   );

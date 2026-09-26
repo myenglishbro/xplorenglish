@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
-import { useMyClassroomsAsTeacher } from "@/features/classrooms/hooks";
+import { useMyClassroomsAsTeacher, useMyWeeklyScheduleAsTeacher } from "@/features/classrooms/hooks";
 import { useAvailability } from "@/features/availability/hooks";
 import { useStudentBalanceAlerts } from "@/features/balanceAlerts/hooks";
 import { DAY_OF_WEEK_LABELS } from "@/features/availability/types";
@@ -9,7 +9,9 @@ import { StatCard } from "@/components/ui/surfaces/StatCard";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { Button } from "@/components/ui/core/Button";
 import { Spinner } from "@/components/ui/feedback/Spinner";
+import { Alert } from "@/components/ui/feedback/Alert";
 import { BalanceAlertsSection } from "@/components/balanceAlerts/BalanceAlertsSection";
+import { WeeklySchedule } from "@/components/schedule/WeeklySchedule";
 
 function cardTitle(text: string) {
   return (
@@ -30,6 +32,7 @@ export function TeacherHomePage() {
   const classroomsQuery = useMyClassroomsAsTeacher();
   const availabilityQuery = useAvailability();
   const balanceAlertsQuery = useStudentBalanceAlerts();
+  const scheduleQuery = useMyWeeklyScheduleAsTeacher();
 
   const isLoading = classroomsQuery.isLoading || availabilityQuery.isLoading;
   const isError = classroomsQuery.isError || availabilityQuery.isError;
@@ -95,6 +98,34 @@ export function TeacherHomePage() {
               {nextAvailabilityBlock.endTime.slice(0, 5)}
             </span>
           </div>
+        )}
+      </Card>
+
+      <Card header={cardTitle("Mi horario semanal")}>
+        {scheduleQuery.isLoading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-5) 0" }}>
+            <Spinner size={24} label="Cargando…" />
+          </div>
+        ) : scheduleQuery.isError || !scheduleQuery.data ? (
+          <Alert tone="danger">No pudimos cargar tu horario. Recarga la página para intentarlo de nuevo.</Alert>
+        ) : (
+          <WeeklySchedule
+            blocks={scheduleQuery.data}
+            emptyTitle="No tienes clases programadas en tu horario semanal."
+            renderBlock={(block) => (
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <span style={{ font: "var(--weight-bold) 11px/1.25 var(--font-body)", color: "var(--text-heading)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {block.startTime.slice(0, 5)}–{block.endTime.slice(0, 5)}
+                </span>
+                <span style={{ font: "var(--weight-semibold) 10.5px/1.25 var(--font-body)", color: "var(--text-body)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {block.studentName ?? "Sin alumno asignado"}
+                </span>
+                <span style={{ font: "var(--weight-regular) 10px/1.25 var(--font-body)", color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {block.classroomName}
+                </span>
+              </div>
+            )}
+          />
         )}
       </Card>
 

@@ -1,10 +1,14 @@
+import React from "react";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { usePaymentDetail } from "@/features/paymentsAdmin/hooks";
+import { usePaymentDetail, useSetReceiptStatus } from "@/features/paymentsAdmin/hooks";
 import { useRefundHoursPackage } from "@/features/hoursAdmin/hooks";
 import { Icon } from "@/components/ui/core/Icon";
 import { Card } from "@/components/ui/surfaces/Card";
 import { Tag } from "@/components/ui/core/Tag";
+import { Select } from "@/components/ui/forms/Select";
+import { Field } from "@/components/ui/forms/Field";
+import { Alert } from "@/components/ui/feedback/Alert";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { PaymentProofSection } from "@/components/admin/payments/PaymentProofSection";
@@ -13,6 +17,7 @@ import { formatCurrencyAmount } from "@/lib/format/currency";
 import { formatMinutesAsHours } from "@/lib/format/minutes";
 import { formatLongDateInLima } from "@/lib/datetime/lima";
 import { PACKAGE_STATUS_LABEL } from "@/server/hours/types";
+import { RECEIPT_STATUS_LABEL, RECEIPT_STATUS_UNREGISTERED_LABEL, type PaymentDetail, type ReceiptStatus } from "@/server/payments/types";
 
 const PAYMENT_STATUS_LABEL: Record<string, string> = {
   pending: "Pendiente",
@@ -28,6 +33,43 @@ const MOVEMENT_TYPE_LABEL: Record<string, string> = {
   adjustment: "Ajuste",
   expiration: "Vencimiento",
 };
+
+const RECEIPT_STATUS_EDIT_OPTIONS = (Object.entries(RECEIPT_STATUS_LABEL) as [ReceiptStatus, string][]).map(([value, label]) => ({ value, label }));
+
+/**
+ * Estado de BOLETA / comprobante de VENTA (FIX 11) -- documental, independiente de payment.status.
+ * NUNCA confundir con la sección "Comprobante de pago" (PaymentProofSection) más abajo, que es
+ * evidencia de que el estudiante pagó. Llama exclusivamente a admin_set_receipt_status (auditado).
+ */
+function ReceiptStatusSection({ payment }: { payment: PaymentDetail }) {
+  const mutation = useSetReceiptStatus();
+  const [error, setError] = React.useState<string | undefined>();
+
+  const options =
+    payment.receiptStatus === null
+      ? [{ value: "unregistered", label: RECEIPT_STATUS_UNREGISTERED_LABEL }, ...RECEIPT_STATUS_EDIT_OPTIONS]
+      : RECEIPT_STATUS_EDIT_OPTIONS;
+  const value = payment.receiptStatus ?? "unregistered";
+
+  async function handleChange(next: string) {
+    if (next === "unregistered" || next === value || mutation.isPending) return;
+    setError(undefined);
+    try {
+      await mutation.mutateAsync({ paymentId: payment.id, status: next as ReceiptStatus });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos actualizar el estado de la boleta.");
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", maxWidth: 320 }}>
+      {error && <Alert tone="danger">{error}</Alert>}
+      <Field label="Estado de boleta" htmlFor="receiptStatus">
+        <Select id="receiptStatus" value={value} options={options} onChange={(e) => handleChange(e.target.value)} disabled={mutation.isPending} />
+      </Field>
+    </div>
+  );
+}
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -98,6 +140,10 @@ export function PagoEstudianteDetailPage() {
         <DetailRow label="Creado el" value={formatLongDateInLima(new Date(payment.createdAt))} />
       </Card>
 
+      <Card header={<span style={{ font: "var(--weight-bold) 15px/1 var(--font-display)", color: "var(--text-heading)" }}>Boleta / comprobante de venta</span>}>
+        <ReceiptStatusSection payment={payment} />
+      </Card>
+
       {payment.package ? (
         <Card header={<span style={{ font: "var(--weight-bold) 15px/1 var(--font-display)", color: "var(--text-heading)" }}>Paquete relacionado</span>}>
           <DetailRow label="Etiqueta" value={payment.package.packageLabel} />
@@ -157,7 +203,10 @@ export function PagoEstudianteDetailPage() {
         )}
       </Card>
 
-      <Card header={<span style={{ font: "var(--weight-bold) 15px/1 var(--font-display)", color: "var(--text-heading)" }}>Comprobante</span>}>
+      <Card header={<span style={{ font: "var(--weight-bold) 15px/1 var(--font-display)", color: "var(--text-heading)" }}>Comprobante de pago</span>}>
+        <p style={{ margin: "0 0 var(--space-3)", color: "var(--text-muted)", fontSize: "var(--text-body-sm-size)" }}>
+          Evidencia de que el estudiante realizó el pago (ej. captura de transferencia) -- distinto de la boleta/comprobante de venta de arriba, que es el documento que la academia emite.
+        </p>
         <PaymentProofSection studentId={payment.studentId} paymentId={payment.id} hasProof={payment.hasProof} />
       </Card>
     </div>

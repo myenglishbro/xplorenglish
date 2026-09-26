@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
 import { listClassrooms, getClassroomDetail, listAssignableTeachers, listAssignableStudents } from "@/server/admin/classrooms/queries";
-import { getTeacherAvailabilityByIds, getTeacherSkillNamesByIds } from "@/server/admin/teachers/queries";
+import { getTeacherAvailabilityByIds, getTeacherOccupiedBlocksByIds, getTeacherSkillNamesByIds } from "@/server/admin/teachers/queries";
 import { classroomSchema, type ClassroomInput } from "@/server/admin/classrooms/validation";
 import type { ClassroomListFilters } from "@/server/admin/classrooms/types";
 
@@ -31,19 +31,22 @@ export function useAssignableTeachers() {
 }
 
 /**
- * Disponibilidad + niveles de un lote de docentes candidatos, para priorizar (AJUSTE 1) sin
- * bloquear: solo alimenta el ordenamiento/etiqueta del selector, RLS admin ya autoriza la lectura.
+ * Disponibilidad + niveles + ocupación real de un lote de docentes candidatos, para priorizar
+ * (AJUSTE 1, FIX 2B) sin bloquear: solo alimenta el ordenamiento/etiqueta del selector, RLS admin
+ * ya autoriza la lectura. `excludeClassroomId` es el salón que se está editando -- sus propios
+ * horarios nunca deben contar como conflicto contra sí mismo.
  */
-export function useTeacherAvailabilityAndSkillsForIds(teacherIds: string[]) {
+export function useTeacherAvailabilityAndSkillsForIds(teacherIds: string[], excludeClassroomId?: number) {
   const sortedIds = [...teacherIds].sort();
   return useQuery({
-    queryKey: ["admin-teachers-availability-skills", sortedIds] as const,
+    queryKey: ["admin-teachers-availability-skills", sortedIds, excludeClassroomId] as const,
     queryFn: async () => {
-      const [availabilityByTeacher, skillsByTeacher] = await Promise.all([
+      const [availabilityByTeacher, skillsByTeacher, occupiedByTeacher] = await Promise.all([
         getTeacherAvailabilityByIds(supabase, sortedIds),
         getTeacherSkillNamesByIds(supabase, sortedIds),
+        getTeacherOccupiedBlocksByIds(supabase, sortedIds, excludeClassroomId),
       ]);
-      return { availabilityByTeacher, skillsByTeacher };
+      return { availabilityByTeacher, skillsByTeacher, occupiedByTeacher };
     },
     enabled: sortedIds.length > 0,
   });

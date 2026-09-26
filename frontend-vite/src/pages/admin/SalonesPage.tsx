@@ -69,8 +69,10 @@ function ClassroomsTabContent() {
   const programId = searchParams.get("program") ? Number(searchParams.get("program")) : undefined;
   const level = VALID_LEVELS.includes(searchParams.get("level") as AcademicLevel) ? (searchParams.get("level") as AcademicLevel) : "all";
   const status = VALID_STATUSES.includes(searchParams.get("status") as ClassroomStatus) ? (searchParams.get("status") as ClassroomStatus) : "all";
+  const search = searchParams.get("q") ?? "";
+  const hasActiveFilters = !!search || programId !== undefined || level !== "all" || status !== "all";
 
-  const classroomsQuery = useClassrooms({ programId, level, status });
+  const classroomsQuery = useClassrooms({ programId, level, status, search });
   const programsQuery = usePrograms();
 
   if (classroomsQuery.isLoading) {
@@ -95,9 +97,15 @@ function ClassroomsTabContent() {
       <ClassroomsFilterBar programs={programsQuery.data ?? []} />
       <Card pad={classrooms.length === 0}>
         {classrooms.length === 0 ? (
-          <EmptyState icon="chalkboard" title="Sin salones todavía">
-            Crea el primero para empezar a asignar docentes y estudiantes.
-          </EmptyState>
+          hasActiveFilters ? (
+            <EmptyState icon="magnifying-glass" title="No se encontraron salones">
+              Prueba con otro nombre de salón o estudiante, o ajusta los filtros.
+            </EmptyState>
+          ) : (
+            <EmptyState icon="chalkboard" title="Sin salones todavía">
+              Crea el primero para empezar a asignar docentes y estudiantes.
+            </EmptyState>
+          )
         ) : (
           <ClassroomsTable items={classrooms} />
         )}

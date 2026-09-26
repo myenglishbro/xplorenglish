@@ -48,6 +48,14 @@ export interface UserListItem {
   /** Solo aplica a role="student". Salón activo (classroom_students.status='active' +
    * classrooms.status='active'), o null si no tiene ninguno asignado. */
   classroom: { id: number; name: string } | null;
+  /** Solo aplica a role="student" (FIX 9, segunda etapa) -- null para los demás roles.
+   * SUM(hours_packages.total_minutes) WHERE status NOT IN ('cancelled','refunded'): histórico
+   * válido de minutos comprados, NUNCA el saldo actual. 0 si nunca compró un paquete. */
+  hoursPurchasedMinutes: number | null;
+  /** Solo aplica a role="student" -- null para los demás roles. SUM(hours_movements.minutes_delta),
+   * la misma fuente de verdad del saldo que usa el resto de la app (nunca recalculado desde
+   * hoursPurchasedMinutes - consumo). */
+  hoursBalanceMinutes: number | null;
 }
 
 export interface UserListResult {
@@ -66,6 +74,9 @@ export interface TeacherProfileSummary {
   hourlyRate: number;
   status: string;
   bio: string | null;
+  /** Enlace a la carpeta de Google Drive del docente para recibos por honorarios (FIX 2, segunda
+   * etapa) -- null si Admin todavía no la configuró. Xplore solo almacena y abre esta URL. */
+  receiptDriveUrl: string | null;
 }
 
 export interface UserDetail {

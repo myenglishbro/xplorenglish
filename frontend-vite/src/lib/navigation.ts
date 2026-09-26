@@ -32,6 +32,7 @@ export const ADMIN_NAV_ITEMS: SidebarNavItem[] = [
   ...institutionalNavItems("/admin/politicas", [
     { value: "/admin/lineamientos-docentes", label: "Lineamientos docentes", icon: "file-text", section: "Institucional" },
     { value: "/admin/test-de-nivel", label: "Test de nivel", icon: "clipboard-text", section: "Institucional" },
+    { value: "/admin/welcome-kit", label: "Welcome Kit", icon: "gift", section: "Institucional" },
   ]),
 ];
 
@@ -52,5 +53,7 @@ export const STUDENT_NAV_ITEMS: SidebarNavItem[] = [
   { value: "/student/horas", label: "Mis horas", icon: "clock" },
   { value: "/student/test-de-nivel", label: "Test de nivel", icon: "clipboard-text" },
   { value: "/student/perfil", label: "Mi perfil", icon: "user-circle" },
-  ...institutionalNavItems("/student/politicas"),
+  ...institutionalNavItems("/student/politicas", [
+    { value: "/student/welcome-kit", label: "Welcome Kit", icon: "gift", section: "Institucional" },
+  ]),
 ];

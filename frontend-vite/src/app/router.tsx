@@ -11,6 +11,7 @@ import { SalonDetailPage } from "@/pages/SalonDetailPage";
 import { PoliciesPage } from "@/pages/PoliciesPage";
 import { TeacherGuidelinesPage } from "@/pages/TeacherGuidelinesPage";
 import { LevelTestPage } from "@/pages/LevelTestPage";
+import { WelcomeKitPage } from "@/pages/WelcomeKitPage";
 import { AuditLogPage } from "@/pages/admin/AuditLogPage";
 
 import { DashboardPage } from "@/pages/admin/DashboardPage";
@@ -80,6 +81,7 @@ export const router = createBrowserRouter([
       { path: "perfil", element: <StudentPerfilPage /> },
       { path: "test-de-nivel", element: <LevelTestPage /> },
       { path: "politicas", element: <PoliciesPage /> },
+      { path: "welcome-kit", element: <WelcomeKitPage /> },
     ],
   },
   {
@@ -112,6 +114,7 @@ export const router = createBrowserRouter([
       { path: "politicas", element: <PoliciesPage /> },
       { path: "lineamientos-docentes", element: <TeacherGuidelinesPage /> },
       { path: "test-de-nivel", element: <LevelTestPage /> },
+      { path: "welcome-kit", element: <WelcomeKitPage /> },
     ],
   },
   { path: "/", element: <LandingPage /> },

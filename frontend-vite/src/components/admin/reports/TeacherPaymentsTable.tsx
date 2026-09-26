@@ -23,9 +23,32 @@ function formatClassDateRange(from: string, to: string): string {
   return fromLabel === toLabel ? `Clase: ${fromLabel}` : `Clases: ${fromLabel} – ${toLabel}`;
 }
 
+interface TeacherPaymentsTableCommonProps {
+  range: LimaDateRange;
+  /** Rediseño UX/UI: cuando se pasa, solo se RENDERIZAN las primeras `limit` filas (SUMMARY) --
+   * el total del footer sigue calculándose sobre `items` completo (nunca sobre lo visible), así
+   * que siempre representa el periodo/rango real, nunca una suma parcial engañosa. Sin `limit`
+   * (u omitido) el comportamiento es EXACTAMENTE el actual (DETAIL: todas las filas). */
+  limit?: number;
+  /** Se invoca desde el CTA "Ver todos los pagos (N)" -- solo aparece si `limit` está activo y
+   * `items.length > limit`. El contenedor (ReportesPage) decide qué hacer (cambiar a vista DETAIL). */
+  onViewAll?: () => void;
+}
+
 type TeacherPaymentsTableProps =
-  | { mode: "payment_date"; items: TeacherPaymentDetailItem[]; range: LimaDateRange }
-  | { mode: "class_date"; items: TeacherPaymentClassRangeItem[]; range: LimaDateRange };
+  | ({ mode: "payment_date"; items: TeacherPaymentDetailItem[] } & TeacherPaymentsTableCommonProps)
+  | ({ mode: "class_date"; items: TeacherPaymentClassRangeItem[] } & TeacherPaymentsTableCommonProps);
+
+function ViewAllPaymentsButton({ total, limit, onViewAll }: { total: number; limit?: number; onViewAll?: () => void }) {
+  if (!limit || !onViewAll || total <= limit) return null;
+  return (
+    <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-3) 0" }}>
+      <Button variant="secondary" size="sm" iconRight="arrow-right" onClick={onViewAll}>
+        Ver todos los pagos ({total})
+      </Button>
+    </div>
+  );
+}
 
 /**
  * Pagos a docentes -- dos modos (mejora posterior a la Segunda Etapa):
@@ -37,10 +60,12 @@ type TeacherPaymentsTableProps =
  *   únicamente esas porciones, así que deliberadamente puede no coincidir con "Docentes pagados".
  */
 export function TeacherPaymentsTable(props: TeacherPaymentsTableProps) {
-  const { mode, items, range } = props;
+  const { range, limit, onViewAll } = props;
   const [openPaymentId, setOpenPaymentId] = React.useState<number | null>(null);
 
-  if (mode === "payment_date") {
+  if (props.mode === "payment_date") {
+    const items = props.items;
+    const visibleItems = limit ? items.slice(0, limit) : items;
     const openPayment = items.find((p) => p.id === openPaymentId) ?? null;
 
     const columns: DataTableColumn<TeacherPaymentDetailItem>[] = [
@@ -64,7 +89,7 @@ export function TeacherPaymentsTable(props: TeacherPaymentsTableProps) {
     if (items.length === 0) {
       return (
         <>
-          <EmptyState icon="hand-coins" title="No hay pagos docentes registrados en este período">
+          <EmptyState icon="hand-coins" title="No hay pagos a docentes en este periodo">
             Cuando se realice un pago a un profesor con fecha dentro del rango seleccionado, aparecerá acá.
           </EmptyState>
           <PaymentDateDetailModal payment={openPayment} onClose={() => setOpenPaymentId(null)} />
@@ -84,14 +109,17 @@ export function TeacherPaymentsTable(props: TeacherPaymentsTableProps) {
             </div>
           }
         >
-          <DataTable columns={columns} rows={items} />
+          <DataTable columns={columns} rows={visibleItems} />
         </Card>
+        <ViewAllPaymentsButton total={items.length} limit={limit} onViewAll={onViewAll} />
 
         <PaymentDateDetailModal payment={openPayment} onClose={() => setOpenPaymentId(null)} />
       </>
     );
   }
 
+  const items = props.items;
+  const visibleItems = limit ? items.slice(0, limit) : items;
   const openPayment = items.find((p) => p.id === openPaymentId) ?? null;
 
   const columns: DataTableColumn<TeacherPaymentClassRangeItem>[] = [
@@ -116,7 +144,7 @@ export function TeacherPaymentsTable(props: TeacherPaymentsTableProps) {
   if (items.length === 0) {
     return (
       <>
-        <EmptyState icon="hand-coins" title="No hay clases pagadas en este período">
+        <EmptyState icon="hand-coins" title="No hay clases pagadas en este periodo">
           Cuando existan clases ya pagadas a un profesor con fecha de clase dentro del rango seleccionado, aparecerán acá.
         </EmptyState>
         <ClassDateDetailModal payment={openPayment} range={range} onClose={() => setOpenPaymentId(null)} />
@@ -136,8 +164,9 @@ export function TeacherPaymentsTable(props: TeacherPaymentsTableProps) {
           </div>
         }
       >
-        <DataTable columns={columns} rows={items} />
+        <DataTable columns={columns} rows={visibleItems} />
       </Card>
+      <ViewAllPaymentsButton total={items.length} limit={limit} onViewAll={onViewAll} />
 
       <ClassDateDetailModal payment={openPayment} range={range} onClose={() => setOpenPaymentId(null)} />
     </>

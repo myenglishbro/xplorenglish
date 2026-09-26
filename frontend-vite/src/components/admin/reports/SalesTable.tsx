@@ -7,14 +7,23 @@ import { formatCurrencyAmount } from "@/lib/format/currency";
 import { formatShortDateInLima } from "@/lib/datetime/lima";
 import type { SalesDetailItem } from "@/server/reports/types";
 
+export interface SalesTableProps {
+  /** Dataset completo del periodo -- el footer SIEMPRE se calcula sobre esto, nunca sobre
+   * `displayItems`, para que el total nunca cambie por una búsqueda/filtro de presentación. */
+  items: SalesDetailItem[];
+  /** Filas a RENDERIZAR (rediseño UX/UI: búsqueda local en la vista DETAIL) -- por defecto igual a
+   * `items` (comportamiento EXACTAMENTE igual al actual cuando se omite). */
+  displayItems?: SalesDetailItem[];
+}
+
 /**
  * Puro detalle de FinancialReport.sales (Slice 4) -- ya viene de student_payments.amount, nunca se
  * vuelve a sumar hours_packages.price_paid acá.
  */
-export function SalesTable({ items }: { items: SalesDetailItem[] }) {
+export function SalesTable({ items, displayItems = items }: SalesTableProps) {
   if (items.length === 0) {
     return (
-      <EmptyState icon="credit-card" title="Sin ventas en este periodo">
+      <EmptyState icon="credit-card" title="No hay ventas registradas en este periodo">
         Cuando un estudiante complete un pago dentro del rango seleccionado, aparecerá acá.
       </EmptyState>
     );
@@ -39,7 +48,13 @@ export function SalesTable({ items }: { items: SalesDetailItem[] }) {
         </div>
       }
     >
-      <DataTable columns={columns} rows={items} />
+      {displayItems.length === 0 ? (
+        <EmptyState icon="magnifying-glass" title="Sin resultados">
+          Ninguna venta coincide con la búsqueda.
+        </EmptyState>
+      ) : (
+        <DataTable columns={columns} rows={displayItems} />
+      )}
     </Card>
   );
 }

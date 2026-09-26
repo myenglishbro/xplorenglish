@@ -84,6 +84,33 @@ export interface TeacherPaymentClassItem {
   amount: number | null;
 }
 
+/** Mejora posterior a la Segunda Etapa: cómo se interpreta el rango Desde/Hasta de "Pagos
+ * realizados a docentes". "payment_date" es el comportamiento existente (teacher_payments.paid_at,
+ * FIX 5, sin cambios). "class_date" es nuevo: el rango se aplica a class_records.occurred_at,
+ * mostrando solo la PORCIÓN de cada teacher_payment cuyas clases caen dentro del rango -- nunca el
+ * total histórico del pago. Semántica explícita a propósito (nunca un boolean). */
+export type TeacherPaymentPeriodMode = "payment_date" | "class_date";
+
+/** Un teacher_payment representado por la PORCIÓN de sus clases cuyo occurred_at cae dentro del
+ * rango consultado (modo "class_date") -- fuente de verdad: class_records con
+ * teacher_payment_id IS NOT NULL, agregadas SOLO entre las que cumplen el rango. `paidAt` es la
+ * fecha real del pago (teacher_payments.paid_at), que puede estar fuera del rango consultado a
+ * propósito: la dimensión temporal filtrada acá es occurred_at, no paid_at. classCount/minutes/
+ * amount son sumas de ESTA porción, nunca los totales oficiales del teacher_payment completo.
+ * classDateFrom/classDateTo son MIN/MAX(occurred_at) solo entre las clases de esta porción. */
+export interface TeacherPaymentClassRangeItem {
+  [key: string]: unknown;
+  id: number;
+  teacherId: string;
+  teacherName: string;
+  paidAt: string;
+  classCount: number;
+  minutes: number;
+  amount: number;
+  classDateFrom: string;
+  classDateTo: string;
+}
+
 export interface ExpenseDetailItem {
   [key: string]: unknown;
   id: number;

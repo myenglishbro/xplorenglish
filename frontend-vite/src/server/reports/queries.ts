@@ -7,6 +7,7 @@ import type {
   TeacherCostDetailItem,
   TeacherPaymentDetailItem,
   TeacherPaymentClassItem,
+  TeacherPaymentClassRangeItem,
   ExpenseDetailItem,
   FinancialMonthlyTrendPoint,
 } from "./types";
@@ -206,6 +207,11 @@ async function listTeacherPaymentsForPeriod(supabase: Client, range: LimaDateRan
  * un pago puntual (nunca precargado para toda la lista): 1 round-trip, con el alumno resuelto vía
  * embed (mismo patrón que getTeacherPaymentStatement en server/payroll/queries.ts). hourlyRateSnapshot
  * y amount son el valor histórico de cada class_record, NUNCA la tarifa actual del profesor.
+ *
+ * `classDateRange` es opcional (mejora posterior a la Segunda Etapa, modo "Fecha de clase"): cuando
+ * se pasa, acota además por occurred_at ∈ rango -- el modal en ese modo debe mostrar EXCLUSIVAMENTE
+ * las clases del rango consultado, nunca todas las del payment (ver TeacherPaymentClassRangeItem).
+ * En modo "Fecha de pago" (sin este parámetro) el comportamiento es EXACTAMENTE el actual.
  */
 interface TeacherPaymentClassRow {
   id: number;
@@ -216,8 +222,12 @@ interface TeacherPaymentClassRow {
   student: { first_name: string; last_name: string } | null;
 }
 
-export async function getTeacherPaymentClassDetail(supabase: Client, teacherPaymentId: number): Promise<TeacherPaymentClassItem[]> {
-  const { data, error } = await supabase
+export async function getTeacherPaymentClassDetail(
+  supabase: Client,
+  teacherPaymentId: number,
+  classDateRange?: LimaDateRange
+): Promise<TeacherPaymentClassItem[]> {
+  let query = supabase
     .from("class_records")
     .select(
       `
@@ -225,9 +235,13 @@ export async function getTeacherPaymentClassDetail(supabase: Client, teacherPaym
       student:profiles!class_records_student_id_fkey(first_name, last_name)
     `
     )
-    .eq("teacher_payment_id", teacherPaymentId)
-    .order("occurred_at", { ascending: true })
-    .returns<TeacherPaymentClassRow[]>();
+    .eq("teacher_payment_id", teacherPaymentId);
+
+  if (classDateRange) {
+    query = query.gte("occurred_at", classDateRange.start.toISOString()).lt("occurred_at", classDateRange.end.toISOString());
+  }
+
+  const { data, error } = await query.order("occurred_at", { ascending: true }).returns<TeacherPaymentClassRow[]>();
 
   if (error) throw error;
 
@@ -239,6 +253,91 @@ export async function getTeacherPaymentClassDetail(supabase: Client, teacherPaym
     hourlyRateSnapshot: row.hourly_rate_snapshot,
     amount: row.amount,
   }));
+}
+
+// ================================================================================================
+// Mejora posterior a la Segunda Etapa: "Pagos realizados a docentes" filtrado por FECHA DE CLASE
+// (class_records.occurred_at) en vez de fecha de pago (teacher_payments.paid_at). Fuente de verdad:
+// class_records con teacher_payment_id IS NOT NULL (única condición de "pagada", nunca status/fecha/
+// total_amount) cuyo occurred_at cae en el rango. Se agrupa en memoria por teacher_payment_id --
+// 2 round-trips totales (class_records + teacher_payments/nombres en batch), NUNCA una query por
+// payment. El teacher_payment original (paid_at, total_amount) NUNCA se modifica ni se recalcula acá:
+// solo se muestra la porción de sus clases que cae dentro del rango pedido.
+// ================================================================================================
+
+interface ClassRecordInRangeRow {
+  id: number;
+  teacher_payment_id: number;
+  occurred_at: string;
+  minutes: number;
+  amount: number | null;
+}
+
+interface TeacherPaymentLookupRow {
+  id: number;
+  teacher_id: string;
+  paid_at: string;
+}
+
+export async function listTeacherPaymentsByClassDateForPeriod(supabase: Client, range: LimaDateRange): Promise<TeacherPaymentClassRangeItem[]> {
+  const { data: classRecords, error } = await supabase
+    .from("class_records")
+    .select("id, teacher_payment_id, occurred_at, minutes, amount")
+    .not("teacher_payment_id", "is", null)
+    .gte("occurred_at", range.start.toISOString())
+    .lt("occurred_at", range.end.toISOString())
+    .returns<ClassRecordInRangeRow[]>();
+
+  if (error) throw error;
+  if (classRecords.length === 0) return [];
+
+  const byPayment = new Map<number, { minutes: number; cents: number; count: number; minOccurred: string; maxOccurred: string }>();
+  for (const row of classRecords) {
+    const cents = toCents(row.amount ?? 0);
+    const entry = byPayment.get(row.teacher_payment_id);
+    if (entry) {
+      entry.minutes += row.minutes;
+      entry.cents += cents;
+      entry.count += 1;
+      if (row.occurred_at < entry.minOccurred) entry.minOccurred = row.occurred_at;
+      if (row.occurred_at > entry.maxOccurred) entry.maxOccurred = row.occurred_at;
+    } else {
+      byPayment.set(row.teacher_payment_id, { minutes: row.minutes, cents, count: 1, minOccurred: row.occurred_at, maxOccurred: row.occurred_at });
+    }
+  }
+
+  const paymentIds = [...byPayment.keys()];
+  const { data: payments, error: paymentsError } = await supabase
+    .from("teacher_payments")
+    .select("id, teacher_id, paid_at")
+    .in("id", paymentIds)
+    .returns<TeacherPaymentLookupRow[]>();
+  if (paymentsError) throw paymentsError;
+
+  const names = await fetchTeacherNames(supabase, [...new Set(payments.map((p) => p.teacher_id))]);
+  const paymentById = new Map(payments.map((p) => [p.id, p]));
+
+  const items: TeacherPaymentClassRangeItem[] = paymentIds
+    .map((paymentId) => {
+      const payment = paymentById.get(paymentId);
+      const agg = byPayment.get(paymentId);
+      if (!payment || !agg) return null;
+      return {
+        id: paymentId,
+        teacherId: payment.teacher_id,
+        teacherName: names.get(payment.teacher_id) ?? "—",
+        paidAt: payment.paid_at,
+        classCount: agg.count,
+        minutes: agg.minutes,
+        amount: agg.cents / 100,
+        classDateFrom: agg.minOccurred,
+        classDateTo: agg.maxOccurred,
+      };
+    })
+    .filter((item): item is TeacherPaymentClassRangeItem => item !== null)
+    .sort((a, b) => b.classDateTo.localeCompare(a.classDateTo));
+
+  return items;
 }
 
 // ================================================================================================

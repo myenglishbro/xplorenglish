@@ -36,11 +36,16 @@ export const RECEIPT_STATUS_UNREGISTERED_LABEL = "Sin registrar";
 /** Mismo shape que SchedulingActionState/ContentActionState -- consistente en todo el proyecto. */
 export type PaymentsActionState<T = never> = { error?: string; fieldErrors?: Record<string, string>; data?: T };
 
+export const STUDENT_PAYMENTS_PAGE_SIZE = 20;
+
 export interface PaymentListItem {
   [key: string]: unknown;
   id: number;
   studentId: string;
   studentName: string;
+  /** profiles.dni del estudiante -- viene del mismo embed que studentName, nunca una query aparte
+   * (evita N+1). Cadena vacía en registros legacy sin DNI -- la UI debe mostrar "DNI no registrado". */
+  studentDni: string;
   amount: number;
   currency: string;
   paymentMethod: string;
@@ -105,4 +110,12 @@ export interface PaymentListFilters {
   studentId?: string;
   status?: PaymentStatus;
   receiptStatus?: ReceiptStatusFilter;
+  page: number;
+}
+
+export interface PaymentListResult {
+  items: PaymentListItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
 }

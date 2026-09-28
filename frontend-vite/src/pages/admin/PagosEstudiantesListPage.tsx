@@ -4,14 +4,18 @@ import { useAssignableStudents } from "@/features/classroomsAdmin/hooks";
 import type { PaymentStatus, ReceiptStatusFilter } from "@/server/payments/types";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { Spinner } from "@/components/ui/feedback/Spinner";
+import { Card } from "@/components/ui/surfaces/Card";
 import { PaymentsFilterBar } from "@/components/admin/payments/PaymentsFilterBar";
 import { PaymentsTable } from "@/components/admin/payments/PaymentsTable";
 import { CreateHourPackageButton } from "@/components/admin/payments/CreateHourPackageButton";
+import { Pagination } from "@/components/admin/users/Pagination";
 
 const VALID_STATUSES: PaymentStatus[] = ["pending", "completed", "failed", "refunded"];
 const VALID_RECEIPT_STATUSES: ReceiptStatusFilter[] = ["pending", "issued", "sent", "not_applicable", "unregistered"];
 
-/** Portado de src/app/admin/pagos-estudiantes/page.tsx. */
+/** Portado de src/app/admin/pagos-estudiantes/page.tsx. Paginación server-side (page en la URL,
+ * mismo patrón que Usuarios/Estudiantes) -- placeholderData mantiene la tabla anterior visible
+ * mientras llega la página siguiente, en vez de reemplazar toda la pantalla por un spinner. */
 export function PagosEstudiantesListPage() {
   const [searchParams] = useSearchParams();
   const statusParam = searchParams.get("status");
@@ -19,8 +23,10 @@ export function PagosEstudiantesListPage() {
   const receiptStatusParam = searchParams.get("receiptStatus");
   const receiptStatus = VALID_RECEIPT_STATUSES.includes(receiptStatusParam as ReceiptStatusFilter) ? (receiptStatusParam as ReceiptStatusFilter) : undefined;
   const studentId = searchParams.get("studentId") ?? undefined;
+  const page = Number(searchParams.get("page")) > 0 ? Number(searchParams.get("page")) : 1;
+  const hasFilters = !!studentId || !!status || !!receiptStatus;
 
-  const paymentsQuery = useStudentPayments({ studentId, status, receiptStatus });
+  const paymentsQuery = useStudentPayments({ studentId, status, receiptStatus, page });
   const studentsQuery = useAssignableStudents();
   const students = studentsQuery.data ?? [];
 
@@ -42,18 +48,38 @@ export function PagosEstudiantesListPage() {
 
       <PaymentsFilterBar students={students} />
 
-      {paymentsQuery.isLoading ? (
+      {paymentsQuery.isPending ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-6) 0" }}>
           <Spinner size={28} label="Cargando…" />
         </div>
       ) : paymentsQuery.isError || !paymentsQuery.data ? (
         <EmptyState icon="warning" title="No pudimos cargar los pagos">Recarga la página para intentarlo de nuevo.</EmptyState>
-      ) : paymentsQuery.data.length === 0 ? (
-        <EmptyState icon="credit-card" title="Sin pagos todavía">
-          Registra el primer pago para crear un paquete de horas.
-        </EmptyState>
       ) : (
-        <PaymentsTable payments={paymentsQuery.data} />
+        <>
+          <Card pad={paymentsQuery.data.items.length === 0} style={{ opacity: paymentsQuery.isFetching ? 0.6 : 1, transition: "opacity var(--duration-fast) var(--ease-standard)" }}>
+            {paymentsQuery.data.items.length === 0 ? (
+              hasFilters ? (
+                <EmptyState icon="credit-card" title="Sin resultados">
+                  No se encontraron pagos con los filtros seleccionados.
+                </EmptyState>
+              ) : (
+                <EmptyState icon="credit-card" title="Sin pagos todavía">
+                  Registra el primer pago para crear un paquete de horas.
+                </EmptyState>
+              )
+            ) : (
+              <PaymentsTable payments={paymentsQuery.data.items} />
+            )}
+          </Card>
+
+          <Pagination
+            page={paymentsQuery.data.page}
+            pageSize={paymentsQuery.data.pageSize}
+            totalCount={paymentsQuery.data.totalCount}
+            basePath="/admin/pagos-estudiantes"
+            searchParams={{ studentId, status, receiptStatus }}
+          />
+        </>
       )}
     </div>
   );

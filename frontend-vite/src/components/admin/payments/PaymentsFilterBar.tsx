@@ -38,6 +38,7 @@ export function PaymentsFilterBar({ students }: PaymentsFilterBarProps) {
         params.set(key, value);
       }
     }
+    params.delete("page");
     setSearchParams(params);
   }
 

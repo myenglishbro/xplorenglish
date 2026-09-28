@@ -68,9 +68,14 @@ export function PaymentsTable({ payments }: { payments: PaymentListItem[] }) {
       key: "studentName",
       header: "Estudiante",
       render: (row) => (
-        <span style={{ font: "var(--weight-semibold) var(--text-body-sm-size)/1.3 var(--font-body)", color: "var(--text-heading)" }}>
-          {row.studentName}
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ font: "var(--weight-semibold) var(--text-body-sm-size)/1.3 var(--font-body)", color: "var(--text-heading)" }}>
+            {row.studentName}
+          </span>
+          <span style={{ font: "var(--weight-regular) var(--text-micro-size)/1.3 var(--font-body)", color: "var(--text-muted)" }}>
+            {row.studentDni ? `DNI ${row.studentDni}` : "DNI no registrado"}
+          </span>
+        </div>
       ),
     },
     { key: "amount", header: "Monto", render: (row) => formatCurrencyAmount(row.amount, row.currency) },

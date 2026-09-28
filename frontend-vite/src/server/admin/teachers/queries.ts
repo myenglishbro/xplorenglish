@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import type { AvailabilityBlockItem, OccupiedBlockItem } from "@/features/availability/types";
-import type { TeacherListItem, TeacherProfileStatus } from "./types";
+import { TEACHERS_PAGE_SIZE, type TeacherListFilters, type TeacherListItem, type TeacherProfileStatus } from "./types";
 
 type Client = SupabaseClient<Database>;
 
@@ -29,7 +29,17 @@ export interface TeacherProfileListItem {
   accountStatus: string;
 }
 
-export async function listTeacherProfiles(supabase: Client): Promise<TeacherProfileListItem[]> {
+export interface TeacherProfileListResult {
+  items: TeacherProfileListItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+/** Todos los docentes, sin paginar -- exclusivo de features que necesitan el universo completo
+ * (grid de disponibilidad conjunta, useAllTeacherAvailability). Nunca usar para el listado principal
+ * de Admin > Docentes (ver listTeacherProfiles paginado abajo). */
+export async function listAllTeacherProfiles(supabase: Client): Promise<TeacherProfileListItem[]> {
   const { data, error } = await supabase
     .from("profiles")
     .select("id, first_name, last_name, phone, status, teacher_profile:teacher_profiles!teacher_profiles_profile_id_fkey(hourly_rate, status)")
@@ -48,6 +58,52 @@ export async function listTeacherProfiles(supabase: Client): Promise<TeacherProf
     teacherStatus: (r.teacher_profile?.status as TeacherProfileStatus | undefined) ?? "inactive",
     accountStatus: r.status,
   }));
+}
+
+/**
+ * Paginación + búsqueda server-side (.range + count exacto, ambos en el mismo round-trip). Búsqueda
+ * ilike sobre first_name/last_name únicamente -- el email vive en auth.users y se resuelve aparte
+ * vía RPC get_user_emails (ver useTeachers), que solo acepta una lista de ids ya conocidos, no un
+ * patrón de texto: incluir email en la búsqueda exigiría un RPC nuevo, fuera de alcance de este
+ * cambio (ver reporte final). Orden estable: first_name asc, id asc como desempate.
+ */
+export async function listTeacherProfiles(supabase: Client, filters: TeacherListFilters): Promise<TeacherProfileListResult> {
+  const page = Math.max(1, filters.page);
+  const from = (page - 1) * TEACHERS_PAGE_SIZE;
+  const to = from + TEACHERS_PAGE_SIZE - 1;
+
+  let query = supabase
+    .from("profiles")
+    .select("id, first_name, last_name, phone, status, teacher_profile:teacher_profiles!teacher_profiles_profile_id_fkey(hourly_rate, status)", {
+      count: "exact",
+    })
+    .eq("role", "teacher");
+
+  const term = filters.search.trim();
+  if (term) {
+    const pattern = `%${term}%`;
+    query = query.or(`first_name.ilike.${pattern},last_name.ilike.${pattern}`);
+  }
+
+  const { data, error, count } = await query
+    .order("first_name", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, to)
+    .returns<RawTeacherProfileRow[]>();
+
+  if (error) throw error;
+
+  const items = data.map((r) => ({
+    id: r.id,
+    firstName: r.first_name,
+    lastName: r.last_name,
+    phone: r.phone,
+    hourlyRate: r.teacher_profile?.hourly_rate ?? 0,
+    teacherStatus: (r.teacher_profile?.status as TeacherProfileStatus | undefined) ?? "inactive",
+    accountStatus: r.status,
+  }));
+
+  return { items, totalCount: count ?? 0, page, pageSize: TEACHERS_PAGE_SIZE };
 }
 
 /** classroom_teachers activos de esos ids en una sola llamada (.in), conteo agregado en memoria --

@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
 import {
   listTeacherProfiles,
+  listAllTeacherProfiles,
   getActiveClassroomCounts,
   getTeacherAvailabilityByIds,
   getAllTeacherAvailabilityByIds,
@@ -12,7 +13,7 @@ import {
 } from "@/server/admin/teachers/queries";
 import { updateTeacherProfileSchema, type UpdateTeacherProfileInput } from "@/server/admin/teachers/validation";
 import { listMyClassroomsAsTeacher } from "@/server/teacher/classrooms/queries";
-import type { TeacherListItem } from "@/server/admin/teachers/types";
+import type { TeacherListFilters, TeacherListResult } from "@/server/admin/teachers/types";
 import type { AvailabilityBlockItem } from "@/features/availability/types";
 
 const TEACHER_EMAILS_RPC_ERROR_MESSAGES: Record<string, string> = {
@@ -33,15 +34,22 @@ function parseTeacherEmailsRpcError(error: { message: string }): Error {
  * acá). Antes: profiles -> classroom_teachers -> emails (3 olas, la última cruzando a Next). Ahora:
  * profiles -> Promise.all(conteo, emails RPC) (2 olas, ambas contra Supabase) -- mismas 3
  * requests, ninguna duplicada, mismo shape final (TeacherListItem).
+ *
+ * Paginación + búsqueda server-side (listTeacherProfiles): profiles/teacher_profiles/count llegan
+ * ya acotados a 20 filas desde la DB; el conteo de salones y los emails se resuelven SOLO para esos
+ * ids de la página (nunca para el universo completo de docentes) -- 3 round-trips totales por
+ * página, igual que antes, ahora sobre un subconjunto en vez de todo el dataset.
  */
-export function useTeachers() {
+export function useTeachers(filters: TeacherListFilters) {
   return useQuery({
-    queryKey: queryKeys.adminTeachers(),
-    queryFn: async (): Promise<TeacherListItem[]> => {
-      const profiles = await listTeacherProfiles(supabase);
-      if (profiles.length === 0) return [];
+    queryKey: queryKeys.adminTeachers(filters),
+    queryFn: async (): Promise<TeacherListResult> => {
+      const profiles = await listTeacherProfiles(supabase, filters);
+      if (profiles.items.length === 0) {
+        return { items: [], totalCount: profiles.totalCount, page: profiles.page, pageSize: profiles.pageSize };
+      }
 
-      const ids = profiles.map((p) => p.id);
+      const ids = profiles.items.map((p) => p.id);
       const [countByTeacher, emailById] = await Promise.all([
         getActiveClassroomCounts(supabase, ids),
         supabase
@@ -52,8 +60,14 @@ export function useTeachers() {
           }),
       ]);
 
-      return profiles.map((p) => toTeacherListItem(p, countByTeacher, emailById));
+      return {
+        items: profiles.items.map((p) => toTeacherListItem(p, countByTeacher, emailById)),
+        totalCount: profiles.totalCount,
+        page: profiles.page,
+        pageSize: profiles.pageSize,
+      };
     },
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -95,7 +109,7 @@ export function useAllTeacherAvailability() {
   return useQuery({
     queryKey: ["admin-all-teacher-availability"] as const,
     queryFn: async () => {
-      const teachers = await listTeacherProfiles(supabase);
+      const teachers = await listAllTeacherProfiles(supabase);
       const teacherIds = teachers.map((teacher) => teacher.id);
       const [availabilityByTeacher, occupiedByTeacher] = await Promise.all([
         getAllTeacherAvailabilityByIds(supabase, teacherIds),
@@ -146,7 +160,7 @@ export function useUpdateTeacherProfile(profileId: string) {
       if (error) throw new Error("No pudimos guardar los cambios. Inténtalo de nuevo en unos minutos.");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.adminTeachers() });
+      queryClient.invalidateQueries({ queryKey: ["admin-teachers"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.adminUserDetail(profileId) });
     },
   });

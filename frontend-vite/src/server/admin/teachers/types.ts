@@ -2,6 +2,20 @@
 // mismo criterio que ProfileStatus en server/admin/users/types.ts.
 export type TeacherProfileStatus = "active" | "inactive";
 
+export const TEACHERS_PAGE_SIZE = 20;
+
+export interface TeacherListFilters {
+  search: string;
+  page: number;
+}
+
+export interface TeacherListResult {
+  items: TeacherListItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface TeacherListItem {
   // Índice requerido por DataTable<T extends Record<string, unknown>> (Design System) -- mismo
   // criterio que UserListItem/ClassroomListItem.

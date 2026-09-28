@@ -1,19 +1,28 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTeachers } from "@/features/teachers/hooks";
 import { Button } from "@/components/ui/core/Button";
 import { Card } from "@/components/ui/surfaces/Card";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { TeachersTable } from "@/components/admin/teachers/TeachersTable";
+import { TeachersFilterBar } from "@/components/admin/teachers/TeachersFilterBar";
 import { AllTeachersAvailabilityGrid } from "@/components/admin/teachers/AllTeachersAvailabilityGrid";
+import { Pagination } from "@/components/admin/users/Pagination";
 
 /**
  * Portado de src/app/admin/docentes/page.tsx. El listado muestra teacher_profiles.status
  * (¿está operativo?), no profiles.status -- ver TeacherListItem/useTeachers para el criterio
  * completo. profiles.status ("Estado de cuenta") queda solo en el detalle.
+ *
+ * Paginación + búsqueda server-side (page/q en la URL, mismo patrón que Usuarios/Estudiantes).
  */
 export function DocentesListPage() {
-  const { data: teachers, isLoading, isError } = useTeachers();
+  const [searchParams] = useSearchParams();
+  const search = searchParams.get("q") ?? "";
+  const page = Number(searchParams.get("page")) > 0 ? Number(searchParams.get("page")) : 1;
+
+  const teachersQuery = useTeachers({ search, page });
   const [showAvailability, setShowAvailability] = useState(false);
 
   return (
@@ -50,22 +59,43 @@ export function DocentesListPage() {
         {showAvailability && <AllTeachersAvailabilityGrid />}
       </Card>
 
-      {isLoading ? (
+      <TeachersFilterBar />
+
+      {teachersQuery.isPending ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-6) 0" }}>
           <Spinner size={28} label="Cargando…" />
         </div>
-      ) : isError || !teachers ? (
+      ) : teachersQuery.isError || !teachersQuery.data ? (
         <EmptyState icon="warning" title="No pudimos cargar los docentes">Recarga la página para intentarlo de nuevo.</EmptyState>
       ) : (
-        <Card pad={teachers.length === 0}>
-          {teachers.length === 0 ? (
-            <EmptyState icon="chalkboard-teacher" title="Todavía no hay docentes">
-              Promueve a un estudiante activo a docente desde su perfil en Usuarios para que aparezca aquí.
-            </EmptyState>
-          ) : (
-            <TeachersTable items={teachers} />
-          )}
-        </Card>
+        <>
+          <Card
+            pad={teachersQuery.data.items.length === 0}
+            style={{ opacity: teachersQuery.isFetching ? 0.6 : 1, transition: "opacity var(--duration-fast) var(--ease-standard)" }}
+          >
+            {teachersQuery.data.items.length === 0 ? (
+              search ? (
+                <EmptyState icon="chalkboard-teacher" title="No se encontraron docentes">
+                  No hay docentes que coincidan con "{search}".
+                </EmptyState>
+              ) : (
+                <EmptyState icon="chalkboard-teacher" title="Todavía no hay docentes">
+                  Promueve a un estudiante activo a docente desde su perfil en Usuarios para que aparezca aquí.
+                </EmptyState>
+              )
+            ) : (
+              <TeachersTable items={teachersQuery.data.items} />
+            )}
+          </Card>
+
+          <Pagination
+            page={teachersQuery.data.page}
+            pageSize={teachersQuery.data.pageSize}
+            totalCount={teachersQuery.data.totalCount}
+            basePath="/admin/docentes"
+            searchParams={{ q: search || undefined }}
+          />
+        </>
       )}
     </div>
   );

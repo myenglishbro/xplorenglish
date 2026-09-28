@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { paymentProofExists } from "@/lib/storage/paymentProofs";
-import type { HoursMovementItem, PaymentDetail, PaymentListFilters, PaymentListItem, ReceiptStatus } from "./types";
+import { STUDENT_PAYMENTS_PAGE_SIZE, type HoursMovementItem, type PaymentDetail, type PaymentListFilters, type PaymentListResult, type ReceiptStatus } from "./types";
 
 type Client = SupabaseClient<Database>;
 
@@ -15,7 +15,7 @@ interface PaymentListRow {
   receipt_status: Database["public"]["Enums"]["receipt_status"] | null;
   paid_at: string | null;
   created_at: string;
-  student: { first_name: string; last_name: string } | null;
+  student: { first_name: string; last_name: string; dni: string } | null;
   hours_packages: { id: number; package_label: string; total_minutes: number; status: Database["public"]["Enums"]["package_status"] }[];
 }
 
@@ -26,18 +26,27 @@ interface PaymentListRow {
  * constraint) -- se toma el primero, defensivamente. `receiptStatus` (FIX 11) es documental, nunca
  * financiero -- filtros.receiptStatus === "unregistered" filtra explícitamente IS NULL, distinto de
  * "sin filtro" (undefined): un truthy-check simple haría imposible filtrar por NULL.
+ *
+ * Paginación server-side (.range) + count exacto en el mismo round-trip -- el DNI viaja en el
+ * mismo embed `student:profiles(...)` que ya resolvía el nombre, así que mostrarlo en la tabla no
+ * agrega ninguna query nueva (nunca N+1). Orden estable: created_at desc, id desc como desempate
+ * (created_at no es único por sí solo si dos pagos se registran en el mismo milisegundo).
  */
-export async function listStudentPayments(supabase: Client, filters: PaymentListFilters = {}): Promise<PaymentListItem[]> {
+export async function listStudentPayments(supabase: Client, filters: PaymentListFilters): Promise<PaymentListResult> {
+  const page = Math.max(1, filters.page);
+  const from = (page - 1) * STUDENT_PAYMENTS_PAGE_SIZE;
+  const to = from + STUDENT_PAYMENTS_PAGE_SIZE - 1;
+
   let query = supabase
     .from("student_payments")
     .select(
       `
       id, student_id, amount, currency, payment_method, status, receipt_status, paid_at, created_at,
-      student:profiles!student_payments_student_id_fkey(first_name,last_name),
+      student:profiles!student_payments_student_id_fkey(first_name,last_name,dni),
       hours_packages(id, package_label, total_minutes, status)
-    `
-    )
-    .order("created_at", { ascending: false });
+    `,
+      { count: "exact" }
+    );
 
   if (filters.studentId) query = query.eq("student_id", filters.studentId);
   if (filters.status) query = query.eq("status", filters.status);
@@ -47,15 +56,20 @@ export async function listStudentPayments(supabase: Client, filters: PaymentList
     query = query.eq("receipt_status", filters.receiptStatus);
   }
 
-  const { data, error } = await query.returns<PaymentListRow[]>();
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to)
+    .returns<PaymentListRow[]>();
   if (error) throw error;
 
-  return data.map((row) => {
+  const items = data.map((row) => {
     const pkg = row.hours_packages[0] ?? null;
     return {
       id: row.id,
       studentId: row.student_id,
       studentName: row.student ? `${row.student.first_name} ${row.student.last_name}` : "Estudiante",
+      studentDni: row.student?.dni ?? "",
       amount: row.amount,
       currency: row.currency,
       paymentMethod: row.payment_method,
@@ -69,6 +83,8 @@ export async function listStudentPayments(supabase: Client, filters: PaymentList
       packageStatus: pkg?.status ?? null,
     };
   });
+
+  return { items, totalCount: count ?? 0, page, pageSize: STUDENT_PAYMENTS_PAGE_SIZE };
 }
 
 interface PaymentDetailRow {

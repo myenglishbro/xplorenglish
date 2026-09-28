@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
 import { listStudentPayments, getPaymentDetail, setReceiptStatus } from "@/server/payments/queries";
@@ -7,8 +7,14 @@ import type { PaymentListFilters, CreateHourPackageResult, ReceiptStatus } from 
 
 export function useStudentPayments(filters: PaymentListFilters) {
   return useQuery({
-    queryKey: queryKeys.adminStudentPayments({ studentId: filters.studentId, status: filters.status, receiptStatus: filters.receiptStatus }),
+    queryKey: queryKeys.adminStudentPayments({
+      studentId: filters.studentId,
+      status: filters.status,
+      receiptStatus: filters.receiptStatus,
+      page: filters.page,
+    }),
     queryFn: () => listStudentPayments(supabase, filters),
+    placeholderData: keepPreviousData,
   });
 }
 

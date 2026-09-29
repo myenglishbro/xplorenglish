@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/core/Button";
 import { Modal } from "@/components/ui/surfaces/Modal";
 import { Field } from "@/components/ui/forms/Field";
 import { Input } from "@/components/ui/forms/Input";
-import { Select } from "@/components/ui/forms/Select";
+import { Combobox } from "@/components/ui/forms/Combobox";
 import { Alert } from "@/components/ui/feedback/Alert";
 import { useCreateHourPackage, type CreateHourPackageFieldErrors } from "@/features/paymentsAdmin/hooks";
 
@@ -75,10 +75,10 @@ export function CreateHourPackageButton({ students, triggerLabel = "Registrar pa
     }
   }
 
-  const studentOptions = [
-    { value: "", label: "Selecciona un estudiante" },
-    ...students.map((s) => ({ value: s.id, label: `${s.firstName} ${s.lastName} (${s.dni})` })),
-  ];
+  const studentOptions = React.useMemo(
+    () => students.map((s) => ({ value: s.id, label: `${s.firstName} ${s.lastName}`.trim(), description: `DNI ${s.dni}` })),
+    [students],
+  );
 
   return (
     <>
@@ -109,7 +109,7 @@ export function CreateHourPackageButton({ students, triggerLabel = "Registrar pa
         <form id={formId} onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           {mutation.isError && !Object.keys(fieldErrors).length && <Alert tone="danger">{(mutation.error as Error).message}</Alert>}
           <Field label="Estudiante" required htmlFor="studentId" error={fieldErrors.studentId}>
-            <Select id="studentId" value={studentId} options={studentOptions} onChange={(e) => setStudentId(e.target.value)} disabled={mutation.isPending} />
+            <Combobox id="studentId" value={studentId} options={studentOptions} onChange={setStudentId} placeholder="Buscar por nombre, apellido o DNI" invalid={!!fieldErrors.studentId} disabled={mutation.isPending} />
           </Field>
           <Field label="Etiqueta del paquete" required htmlFor="packageLabel" error={fieldErrors.packageLabel} hint="Ej. '10 horas'">
             <Input id="packageLabel" value={packageLabel} onChange={(e) => setPackageLabel(e.target.value)} disabled={mutation.isPending} />

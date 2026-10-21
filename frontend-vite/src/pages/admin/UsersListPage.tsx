@@ -1,5 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-import { useUsers } from "@/features/users/hooks";
+import { useUsers, useUserEmails } from "@/features/users/hooks";
 import type { ProfileStatus, UserRole } from "@/server/admin/users/types";
 import { Card } from "@/components/ui/surfaces/Card";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
@@ -24,6 +24,7 @@ export function UsersListPage() {
   const search = searchParams.get("q") ?? "";
 
   const { data: result, isLoading, isError } = useUsers({ search, role, status, page });
+  const emailsQuery = useUserEmails(result?.items.map((item) => item.id) ?? []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
@@ -54,7 +55,7 @@ export function UsersListPage() {
                 No se encontraron usuarios con los filtros actuales.
               </EmptyState>
             ) : (
-              <UsersTable items={result.items} mode="usuarios" />
+              <UsersTable items={result.items} mode="usuarios" emails={emailsQuery.data?.emails} />
             )}
           </Card>
 

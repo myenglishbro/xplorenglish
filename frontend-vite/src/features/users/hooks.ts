@@ -133,6 +133,29 @@ export function usePromoteToTeacher(profileId: string) {
   });
 }
 
+const DEMOTE_RPC_ERROR_MESSAGES: Record<string, string> = {
+  NOT_AUTHORIZED: "No tienes permisos para realizar esta acción.",
+  PROFILE_NOT_FOUND: "El perfil no existe.",
+  NOT_A_TEACHER: "Este usuario ya no tiene rol docente.",
+  HAS_ACTIVE_CLASSROOMS: "El docente tiene salones activos asignados. Reasígnalos o finalízalos antes de pasarlo a estudiante.",
+};
+
+/** Transición inversa: teacher -> student, vía RPC demote_teacher_to_student() (conserva el
+ * historial y deja inactivo su perfil docente). */
+export function useDemoteToStudent(profileId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("demote_teacher_to_student", { p_target_profile_id: profileId });
+      if (error) {
+        const code = error.message.split(":")[0] ?? "";
+        throw new Error(DEMOTE_RPC_ERROR_MESSAGES[code] ?? "No pudimos pasar al docente a estudiante.");
+      }
+    },
+    onSuccess: () => invalidateUserQueries(queryClient, profileId),
+  });
+}
+
 export interface ResetTempPasswordResult {
   tempPassword: string;
   /** Presente solo en el caso parcial: la contraseña de Auth SÍ cambió, pero

@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
-import { useUsers } from "@/features/users/hooks";
+import { useUsers, useUserEmails } from "@/features/users/hooks";
 import type { ProfileStatus } from "@/server/admin/users/types";
 import { Card } from "@/components/ui/surfaces/Card";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui/feedback/Spinner";
 import { Button } from "@/components/ui/core/Button";
 import { UsersFilterBar } from "@/components/admin/users/UsersFilterBar";
 import { UsersTable } from "@/components/admin/users/UsersTable";
+import { PageHeading } from "@/components/admin/users/userCells";
 import { Pagination } from "@/components/admin/users/Pagination";
 
 const VALID_STATUSES: ProfileStatus[] = ["active", "inactive"];
@@ -23,26 +24,22 @@ export function EstudiantesListPage() {
   const search = searchParams.get("q") ?? "";
 
   const { data: result, isLoading, isError } = useUsers({ search, role: "student", status, page });
+  const emailsQuery = useUserEmails(result?.items.map((item) => item.id) ?? []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)" }}>
-        <h1
-          style={{
-            font: "var(--weight-bold) var(--text-h2-size)/var(--text-h2-lh) var(--font-display)",
-            letterSpacing: "var(--text-h2-ls)",
-            color: "var(--text-heading)",
-            margin: 0,
-          }}
-        >
-          Estudiantes
-        </h1>
-        <Link to="/admin/estudiantes/nuevo">
-          <Button variant="primary" icon="user-plus">
-            Nuevo estudiante
-          </Button>
-        </Link>
-      </div>
+      <PageHeading
+        icon="student"
+        title="Estudiantes"
+        subtitle={result ? `${result.totalCount} ${result.totalCount === 1 ? "estudiante" : "estudiantes"}` : undefined}
+        actions={
+          <Link to="/admin/estudiantes/nuevo">
+            <Button variant="primary" icon="user-plus">
+              Nuevo estudiante
+            </Button>
+          </Link>
+        }
+      />
 
       <UsersFilterBar showRoleFilter={false} />
 
@@ -60,7 +57,7 @@ export function EstudiantesListPage() {
                 No se encontraron estudiantes con los filtros actuales.
               </EmptyState>
             ) : (
-              <UsersTable items={result.items} mode="estudiantes" />
+              <UsersTable items={result.items} mode="estudiantes" emails={emailsQuery.data?.emails} />
             )}
           </Card>
 

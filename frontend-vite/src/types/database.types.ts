@@ -1387,6 +1387,10 @@ export type Database = {
           total_minutes: number
         }[]
       }
+      demote_teacher_to_student: {
+        Args: { p_target_profile_id: string }
+        Returns: Database["public"]["Tables"]["profiles"]["Row"]
+      }
       promote_user_to_teacher: {
         Args: { p_initial_hourly_rate: number; p_target_profile_id: string }
         Returns: {

@@ -1,7 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
-import { useUserDetail, useRoleChanges, usePrograms, useArchiveUser, useRestoreUser } from "@/features/users/hooks";
+import { useUserDetail, useRoleChanges, usePrograms, useUserEmails, useArchiveUser, useRestoreUser } from "@/features/users/hooks";
 import type { UserRole } from "@/server/admin/users/types";
+import { CopyableText } from "@/components/admin/CopyableText";
 import { Card } from "@/components/ui/surfaces/Card";
 import { Tag } from "@/components/ui/core/Tag";
 import { Icon } from "@/components/ui/core/Icon";
@@ -10,6 +11,7 @@ import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { UserEditForm } from "@/components/admin/users/UserEditForm";
 import { StatusToggle } from "@/components/admin/users/StatusToggle";
 import { PromoteToTeacherPanel } from "@/components/admin/users/PromoteToTeacherPanel";
+import { DemoteToStudentPanel } from "@/components/admin/users/DemoteToStudentPanel";
 import { ResetTempPasswordPanel } from "@/components/admin/users/ResetTempPasswordPanel";
 import { RoleChangesHistory } from "@/components/admin/users/RoleChangesHistory";
 import { ReasonConfirmButton } from "@/components/admin/ReasonConfirmButton";
@@ -33,6 +35,7 @@ export function UserDetailPage() {
   const userQuery = useUserDetail(id ?? "");
   const roleChangesQuery = useRoleChanges(id ?? "");
   const programsQuery = usePrograms();
+  const emailsQuery = useUserEmails(id ? [id] : []);
   const archiveMutation = useArchiveUser(id ?? "");
   const restoreMutation = useRestoreUser(id ?? "");
 
@@ -51,6 +54,7 @@ export function UserDetailPage() {
   const user = userQuery.data;
   const roleChanges = roleChangesQuery.data ?? [];
   const programs = programsQuery.data ?? [];
+  const email = emailsQuery.data?.emails[user.id] ?? null;
   const isSelf = authUser?.id === user.id;
   const isArchived = user.archivedAt !== null;
 
@@ -83,6 +87,11 @@ export function UserDetailPage() {
           )}
           {isArchived && <Tag tone="neutral">Archivado</Tag>}
         </div>
+        {email && (
+          <p style={{ margin: "8px 0 0", color: "var(--text-muted)" }}>
+            <CopyableText value={email} label="Copiar correo" />
+          </p>
+        )}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "var(--space-5)" }}>
@@ -171,6 +180,12 @@ export function UserDetailPage() {
           {user.role === "student" && user.status === "active" && (
             <Card header={cardTitle("Rol")}>
               <PromoteToTeacherPanel userId={user.id} fullName={`${user.firstName} ${user.lastName}`} />
+            </Card>
+          )}
+
+          {user.role === "teacher" && (
+            <Card header={cardTitle("Rol")}>
+              <DemoteToStudentPanel userId={user.id} fullName={`${user.firstName} ${user.lastName}`} />
             </Card>
           )}
 

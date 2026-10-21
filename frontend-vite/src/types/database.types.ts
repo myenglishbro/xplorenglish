@@ -1314,6 +1314,40 @@ export type Database = {
         Args: { p_classroom_id: number }
         Returns: number
       }
+      get_my_classroom_history: {
+        Args: never
+        Returns: {
+          classes_count: number
+          classroom_id: number
+          classroom_name: string
+          classroom_status: string
+          first_class_at: string
+          is_active_member: boolean
+          last_class_at: string
+          level: Database["public"]["Enums"]["academic_level"]
+          paid_amount: number
+          pending_amount: number
+          program_name: string
+          rescheduled_count: number
+          student_name: string
+          total_amount: number
+          total_minutes: number
+        }[]
+      }
+      get_my_classroom_history_records: {
+        Args: { p_classroom_id: number }
+        Returns: {
+          amount: number
+          hourly_rate_snapshot: number
+          id: number
+          minutes: number
+          notes: string
+          occurred_at: string
+          paid_at: string
+          status: Database["public"]["Enums"]["class_record_status"]
+          teacher_payment_id: number
+        }[]
+      }
       get_student_balance_alerts: {
         Args: never
         Returns: {

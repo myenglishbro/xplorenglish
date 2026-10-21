@@ -58,3 +58,82 @@ export async function listMyClassroomsAsTeacher(supabase: Client, teacherId: str
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+export interface ClassroomHistoryItem {
+  [key: string]: unknown;
+  classroomId: number;
+  classroomName: string;
+  programName: string;
+  level: Database["public"]["Enums"]["academic_level"];
+  /** classrooms.status: 'archived' = finalizado. */
+  classroomStatus: string;
+  /** false si el docente ya no tiene membresía activa en el salón. */
+  isActiveMember: boolean;
+  studentName: string | null;
+  classesCount: number;
+  rescheduledCount: number;
+  totalMinutes: number;
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+  firstClassAt: string;
+  lastClassAt: string;
+}
+
+export interface ClassroomHistoryRecord {
+  [key: string]: unknown;
+  id: number;
+  occurredAt: string;
+  status: Database["public"]["Enums"]["class_record_status"];
+  minutes: number;
+  hourlyRateSnapshot: number | null;
+  amount: number | null;
+  paid: boolean;
+  paidAt: string | null;
+  notes: string | null;
+}
+
+/**
+ * get_my_classroom_history (0046): salones donde ESTE docente dictó clases, incluidos los
+ * archivados que RLS le oculta (is_classroom_teacher exige classrooms.status='active'). La RPC es
+ * de solo lectura y filtra por auth.uid() en el servidor -- nunca recibe un teacher_id del cliente.
+ */
+export async function listMyClassroomHistory(supabase: Client): Promise<ClassroomHistoryItem[]> {
+  const { data, error } = await supabase.rpc("get_my_classroom_history");
+  if (error) throw error;
+
+  return data.map((r) => ({
+    classroomId: r.classroom_id,
+    classroomName: r.classroom_name,
+    programName: r.program_name ?? "—",
+    level: r.level,
+    classroomStatus: r.classroom_status,
+    isActiveMember: r.is_active_member,
+    studentName: r.student_name,
+    classesCount: r.classes_count,
+    rescheduledCount: r.rescheduled_count,
+    totalMinutes: r.total_minutes,
+    totalAmount: Number(r.total_amount),
+    paidAmount: Number(r.paid_amount),
+    pendingAmount: Number(r.pending_amount),
+    firstClassAt: r.first_class_at,
+    lastClassAt: r.last_class_at,
+  }));
+}
+
+export async function listMyClassroomHistoryRecords(supabase: Client, classroomId: number): Promise<ClassroomHistoryRecord[]> {
+  const { data, error } = await supabase.rpc("get_my_classroom_history_records", { p_classroom_id: classroomId });
+  if (error) throw error;
+
+  return data.map((r) => ({
+    id: r.id,
+    occurredAt: r.occurred_at,
+    status: r.status,
+    minutes: r.minutes,
+    hourlyRateSnapshot: r.hourly_rate_snapshot === null ? null : Number(r.hourly_rate_snapshot),
+    amount: r.amount === null ? null : Number(r.amount),
+    paid: r.teacher_payment_id !== null,
+    paidAt: r.paid_at,
+    notes: r.notes,
+  }));
+}

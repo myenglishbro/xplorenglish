@@ -6,6 +6,9 @@ import type { InstitutionalDocumentType } from "@/server/institutionalDocuments/
 export const queryKeys = {
   availability: (teacherId?: string) => ["teacher-availability", teacherId] as const,
   teacherClassrooms: (teacherId?: string) => ["teacher-classrooms", teacherId] as const,
+  teacherClassroomHistory: (teacherId?: string) => ["teacher-classroom-history", teacherId] as const,
+  teacherClassroomHistoryRecords: (teacherId: string | undefined, classroomId: number) =>
+    ["teacher-classroom-history-records", teacherId, classroomId] as const,
   studentClassrooms: (studentId?: string) => ["student-classrooms", studentId] as const,
   teacherProfile: (id?: string) => ["teacher-profile", id] as const,
   studentProfile: (id?: string) => ["student-profile", id] as const,

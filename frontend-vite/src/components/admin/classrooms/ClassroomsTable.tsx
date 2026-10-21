@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { DataTable, type DataTableColumn } from "@/components/ui/surfaces/DataTable";
 import { Tag } from "@/components/ui/core/Tag";
+import { TwoLineCell } from "@/components/admin/TwoLineCell";
 import { Icon } from "@/components/ui/core/Icon";
 import { getStudentBalanceStatus } from "@/lib/hours/balanceStatus";
 import type { ClassroomListItem } from "@/server/admin/classrooms/types";
@@ -12,14 +13,32 @@ export function ClassroomsTable({ items }: { items: ClassroomListItem[] }) {
     {
       key: "name",
       header: "Salón",
-      render: (row) => <span style={{ font: "var(--weight-semibold) var(--text-body-sm-size)/1.3 var(--font-body)", color: "var(--text-heading)" }}>{row.name}</span>,
+      render: (row) => <TwoLineCell strong primary={row.name} secondary={`${row.programName} · ${row.level}`} />,
     },
-    { key: "programName", header: "Programa" },
-    { key: "level", header: "Nivel" },
     {
       key: "studentName",
       header: "Estudiante",
-      render: (row) => row.studentName ?? <span style={{ color: "var(--text-muted)" }}>Sin asignar</span>,
+      render: (row) => {
+        if (!row.studentName) return <span style={{ color: "var(--text-muted)" }}>Sin asignar</span>;
+        const balanceStatus = row.studentBalance === null ? null : getStudentBalanceStatus(row.studentBalance);
+        return (
+          <TwoLineCell
+            primary={row.studentName}
+            secondary={
+              row.studentBalance === null ? undefined : (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {row.studentBalance} min
+                  {balanceStatus && balanceStatus.status !== "normal" && (
+                    <Tag tone={balanceStatus.tone} size="sm">
+                      {balanceStatus.label}
+                    </Tag>
+                  )}
+                </span>
+              )
+            }
+          />
+        );
+      },
     },
     {
       key: "teachers",
@@ -34,20 +53,6 @@ export function ClassroomsTable({ items }: { items: ClassroomListItem[] }) {
             style={{ display: "inline-block", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
           >
             {label}
-          </span>
-        );
-      },
-    },
-    {
-      key: "studentBalance",
-      header: "Saldo",
-      render: (row) => {
-        if (row.studentBalance === null) return <span style={{ color: "var(--text-muted)" }}>—</span>;
-        const balanceStatus = getStudentBalanceStatus(row.studentBalance);
-        return (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span>{row.studentBalance} min</span>
-            {balanceStatus.status !== "normal" && <Tag tone={balanceStatus.tone} size="sm">{balanceStatus.label}</Tag>}
           </span>
         );
       },

@@ -71,11 +71,14 @@ async function fetchStudentBalances(supabase: Client, studentIds: string[]): Pro
  * columnas por palabra), así "Vivian Florian" exige ambas palabras presentes sin depender de una
  * columna de nombre completo que no existe. Nunca se deduce el alumno desde classrooms.name.
  */
-async function findStudentIdsMatchingSearch(supabase: Client, term: string): Promise<string[]> {
+async function findProfileIdsMatchingSearch(supabase: Client, term: string, role: "student" | null): Promise<string[]> {
   const words = term.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
 
-  let query = supabase.from("profiles").select("id").eq("role", "student");
+  let query = supabase.from("profiles").select("id");
+  // Docentes: sin filtro de role -- un ex-docente (ahora estudiante) puede seguir con membresías
+  // activas históricas; classroom_teachers ya acota a quien realmente enseña en un salón.
+  if (role) query = query.eq("role", role);
   for (const word of words) {
     const pattern = `%${word}%`;
     query = query.or(`first_name.ilike.${pattern},last_name.ilike.${pattern}`);
@@ -86,12 +89,30 @@ async function findStudentIdsMatchingSearch(supabase: Client, term: string): Pro
   return data.map((r) => r.id);
 }
 
+/** Ids de salones donde alguno de los docentes dados tiene una membresía activa. */
+async function findClassroomIdsByTeacherIds(supabase: Client, teacherIds: string[]): Promise<number[]> {
+  if (teacherIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("classroom_teachers")
+    .select("classroom_id")
+    .in("teacher_id", teacherIds)
+    .eq("status", "active");
+  if (error) throw error;
+  return [...new Set(data.map((r) => r.classroom_id))];
+}
+
 export async function listClassrooms(supabase: Client, filters: ClassroomListFilters): Promise<ClassroomListItem[]> {
   let query = supabase.from("classrooms").select(LIST_SELECT).order("name", { ascending: true });
 
   if (filters.programId) query = query.eq("program_id", filters.programId);
   if (filters.level && filters.level !== "all") query = query.eq("level", filters.level);
   if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
+
+  if (filters.teacherId) {
+    const classroomIds = await findClassroomIdsByTeacherIds(supabase, [filters.teacherId]);
+    if (classroomIds.length === 0) return [];
+    query = query.in("id", classroomIds);
+  }
 
   const term = filters.search?.trim() ?? "";
   if (term) {
@@ -100,11 +121,16 @@ export async function listClassrooms(supabase: Client, filters: ClassroomListFil
     // classrooms.student_id -- nunca se infiere del nombre del salón. Sobre ESE resultado (todo el
     // dataset que cumple programa/nivel/estado, no solo la página visible -- Salones no tiene
     // paginación server-side hoy) se aplica el OR nombre-de-salón / alumno-coincidente.
-    const matchedStudentIds = await findStudentIdsMatchingSearch(supabase, term);
-    query =
-      matchedStudentIds.length > 0
-        ? query.or(`name.ilike.${pattern},student_id.in.(${matchedStudentIds.join(",")})`)
-        : query.ilike("name", pattern);
+    // Mismo criterio para docente: se resuelve por nombre y se llega al salón vía classroom_teachers.
+    const [matchedStudentIds, matchedTeacherIds] = await Promise.all([
+      findProfileIdsMatchingSearch(supabase, term, "student"),
+      findProfileIdsMatchingSearch(supabase, term, null),
+    ]);
+    const matchedClassroomIds = await findClassroomIdsByTeacherIds(supabase, matchedTeacherIds);
+    const conditions = [`name.ilike.${pattern}`];
+    if (matchedStudentIds.length > 0) conditions.push(`student_id.in.(${matchedStudentIds.join(",")})`);
+    if (matchedClassroomIds.length > 0) conditions.push(`id.in.(${matchedClassroomIds.join(",")})`);
+    query = query.or(conditions.join(","));
   }
 
   const { data, error } = await query.returns<ClassroomListRow[]>();

@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
-import { useClassrooms } from "@/features/classroomsAdmin/hooks";
+import { useClassrooms, useAssignableTeachers } from "@/features/classroomsAdmin/hooks";
 import { useProgramsPanel } from "@/features/programs/hooks";
 import { usePrograms } from "@/features/users/hooks";
 import { ACADEMIC_LEVELS, type AcademicLevel } from "@/server/admin/users/types";
@@ -79,15 +79,17 @@ function ClassroomsTabContent() {
   const status: ClassroomStatus | "all" = rawStatus === "all" ? "all" : VALID_STATUSES.includes(rawStatus as ClassroomStatus) ? (rawStatus as ClassroomStatus) : "active";
 
   const search = searchParams.get("q") ?? "";
-  const hasActiveFilters = !!search || programId !== undefined || level !== "all" || hasExplicitStatusFilter;
+  const teacherId = searchParams.get("teacher") || undefined;
+  const hasActiveFilters = !!search || !!teacherId || programId !== undefined || level !== "all" || hasExplicitStatusFilter;
 
-  const classroomsQuery = useClassrooms({ programId, level, status, search });
+  const classroomsQuery = useClassrooms({ programId, level, status, search, teacherId });
   const programsQuery = usePrograms();
+  const teachersQuery = useAssignableTeachers();
 
   if (classroomsQuery.isLoading) {
     return (
       <>
-        <ClassroomsFilterBar programs={programsQuery.data ?? []} />
+        <ClassroomsFilterBar programs={programsQuery.data ?? []} teachers={teachersQuery.data ?? []} />
         <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-6) 0" }}>
           <Spinner size={28} label="Cargando…" />
         </div>
@@ -103,12 +105,12 @@ function ClassroomsTabContent() {
 
   return (
     <>
-      <ClassroomsFilterBar programs={programsQuery.data ?? []} />
+      <ClassroomsFilterBar programs={programsQuery.data ?? []} teachers={teachersQuery.data ?? []} />
       <Card pad={classrooms.length === 0}>
         {classrooms.length === 0 ? (
           hasActiveFilters ? (
             <EmptyState icon="magnifying-glass" title="No se encontraron salones">
-              Prueba con otro nombre de salón o estudiante, o ajusta los filtros.
+              Prueba con otro nombre de salón, estudiante o docente, o ajusta los filtros.
             </EmptyState>
           ) : (
             <EmptyState icon="chalkboard" title="Sin salones todavía">

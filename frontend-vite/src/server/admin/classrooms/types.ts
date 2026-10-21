@@ -27,8 +27,10 @@ export interface ClassroomListFilters {
   programId?: number;
   level?: AcademicLevel | "all";
   status?: ClassroomStatus | "all";
+  /** Salones donde este docente (profile id) tiene una membresía activa. */
+  teacherId?: string;
   /** Búsqueda libre (FIX 10, segunda etapa) -- coincide contra classrooms.name o el nombre/apellido
-   * del estudiante asignado (classrooms.student_id -> profiles), nunca deducido de classrooms.name. */
+   * del estudiante asignado (classrooms.student_id -> profiles) o de un docente activo del salón, nunca deducido de classrooms.name. */
   search?: string;
 }
 

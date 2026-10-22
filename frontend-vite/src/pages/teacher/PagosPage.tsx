@@ -14,6 +14,7 @@ import { formatShortDateInLima, formatTimeInLima } from "@/lib/datetime/lima";
 import { useMyPaymentStatement, useMyStudentsForTeacher } from "@/features/payroll/hooks";
 import { useMyTeacherProfile } from "@/features/profile/hooks";
 import { MyPaymentsReport } from "@/components/teacher/payroll/MyPaymentsReport";
+import { MyClassroomsFinancialSummary } from "@/components/teacher/payroll/MyClassroomsFinancialSummary";
 import { FINANCIAL_STATUS_LABEL, FINANCIAL_STATUS_TONE, type TeacherPaymentStatementRow } from "@/server/payroll/types";
 
 interface Row extends TeacherPaymentStatementRow {
@@ -103,6 +104,8 @@ export function TeacherPagosPage() {
           />
         </Field>
       </div>
+
+      {rows && <MyClassroomsFinancialSummary rows={rows} />}
 
       <MyPaymentsReport studentId={activeStudentId} studentName={activeStudentName} />
 

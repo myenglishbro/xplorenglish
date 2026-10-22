@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useMyClassroomsAsTeacher } from "@/features/classrooms/hooks";
 import { Card } from "@/components/ui/surfaces/Card";
 import { Tag } from "@/components/ui/core/Tag";
@@ -7,8 +7,6 @@ import { Icon } from "@/components/ui/core/Icon";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { Spinner } from "@/components/ui/feedback/Spinner";
 import { Alert } from "@/components/ui/feedback/Alert";
-import { Tabs } from "@/components/ui/navigation/Tabs";
-import { ClassroomHistoryList } from "@/components/teacher/classrooms/ClassroomHistoryList";
 
 /** Recorta a 2 líneas con elipsis -- técnica CSS estándar (`-webkit-line-clamp`), sin librería
  * nueva, ampliamente soportada. Nunca fuerza `white-space: nowrap` (permite que el título envuelva
@@ -20,14 +18,7 @@ const TWO_LINE_CLAMP: CSSProperties = {
   overflow: "hidden",
 };
 
-const TABS = [
-  { value: "activos", label: "Activos" },
-  { value: "historial", label: "Historial" },
-];
-
 export function TeacherSalonesPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get("tab") === "historial" ? "historial" : "activos";
   const { data: classrooms, isLoading, isError } = useMyClassroomsAsTeacher();
 
   return (
@@ -43,11 +34,7 @@ export function TeacherSalonesPage() {
         Mis salones
       </h1>
 
-      <Tabs items={TABS} value={tab} onChange={(value) => setSearchParams(value === "activos" ? {} : { tab: value })} />
-
-      {tab === "historial" ? (
-        <ClassroomHistoryList />
-      ) : isLoading ? (
+      {isLoading ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-5) 0" }}>
           <Spinner size={24} label="Cargando salones…" />
         </div>

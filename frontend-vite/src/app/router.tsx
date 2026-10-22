@@ -36,7 +36,6 @@ import { PagoDocenteDetailPage } from "@/pages/admin/PagoDocenteDetailPage";
 import { TeacherHomePage } from "@/pages/teacher/TeacherHomePage";
 import { AvailabilityPage } from "@/pages/teacher/AvailabilityPage";
 import { TeacherSalonesPage } from "@/pages/teacher/SalonesPage";
-import { TeacherSalonHistorialPage } from "@/pages/teacher/SalonHistorialPage";
 import { TeacherPagosPage } from "@/pages/teacher/PagosPage";
 import { TeacherPerfilPage } from "@/pages/teacher/PerfilPage";
 
@@ -60,7 +59,6 @@ export const router = createBrowserRouter([
       { index: true, element: <TeacherHomePage /> },
       { path: "disponibilidad", element: <AvailabilityPage /> },
       { path: "salones", element: <TeacherSalonesPage /> },
-      { path: "salones/historial/:id", element: <TeacherSalonHistorialPage /> },
       { path: "salones/:id", element: <SalonDetailPage role="teacher" /> },
       { path: "pagos", element: <TeacherPagosPage /> },
       { path: "perfil", element: <TeacherPerfilPage /> },

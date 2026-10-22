@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/auth/useAuth";
 import { queryKeys } from "@/lib/queryKeys";
-import { listMyClassroomsAsTeacher, listMyClassroomHistory, listMyClassroomHistoryRecords } from "@/server/teacher/classrooms/queries";
+import { listMyClassroomsAsTeacher } from "@/server/teacher/classrooms/queries";
 import { listMyClassroomsAsStudent } from "@/server/student/classrooms/queries";
 import { getMyWeeklyScheduleAsTeacher } from "@/server/teacher/schedule/queries";
 import { getMyWeeklyScheduleAsStudent } from "@/server/student/schedule/queries";
@@ -13,25 +13,6 @@ export function useMyClassroomsAsTeacher() {
     queryKey: queryKeys.teacherClassrooms(user?.id),
     queryFn: () => listMyClassroomsAsTeacher(supabase, user!.id),
     enabled: !!user,
-  });
-}
-
-/** Historial de salones dictados (incluye archivados) con totales de clases y pagos. */
-export function useMyClassroomHistory() {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: queryKeys.teacherClassroomHistory(user?.id),
-    queryFn: () => listMyClassroomHistory(supabase),
-    enabled: !!user,
-  });
-}
-
-export function useMyClassroomHistoryRecords(classroomId: number) {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: queryKeys.teacherClassroomHistoryRecords(user?.id, classroomId),
-    queryFn: () => listMyClassroomHistoryRecords(supabase, classroomId),
-    enabled: !!user && Number.isFinite(classroomId),
   });
 }
 

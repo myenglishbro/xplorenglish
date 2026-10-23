@@ -219,7 +219,7 @@ export function LoginPage() {
           <div className="relative flex w-full flex-col justify-between px-12 py-10 xl:px-16 xl:py-12">
             {/* Brand */}
             <div className="xp-login-rise" style={{ ["--d" as string]: 0 }}>
-              <Logo height={36} />
+              <Logo height={55} />
             </div>
 
             {/* Main message + mascota */}
@@ -236,7 +236,7 @@ export function LoginPage() {
               >
                 Hi,
                 <br />
-                <span style={{ color: "var(--xp-orange)" }}>Explorers!</span>
+                <span style={{ color: "var(--xp-orange)" }}>Xplorers!</span>
               </h2>
 
               <p

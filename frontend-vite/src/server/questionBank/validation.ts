@@ -110,6 +110,8 @@ const base = {
   title: text("El título"),
   instructions: z.string().trim().optional(),
   level: z.string().trim().optional(),
+  /** Tema/categoría para agrupar y filtrar al asignar (ej. "Pasado simple"). */
+  topic: z.string().trim().optional(),
 };
 
 const itemsSchema = z.array(itemSchema).min(1, "Incluye al menos una pregunta").max(50, "Máximo 50 preguntas por ejercicio");

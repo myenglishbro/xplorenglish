@@ -32,6 +32,16 @@ export function useExercises() {
   });
 }
 
+/** Temas ya usados en el banco, sin repetir (ignora mayúsculas) y ordenados. */
+export function uniqueTopics(items: ExerciseListItem[]): string[] {
+  const seen = new Map<string, string>();
+  for (const e of items) {
+    const t = e.content.topic?.trim();
+    if (t && !seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+
 export function useCreateExercise() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

@@ -13,7 +13,7 @@ import { detectKnownProvider } from "@/lib/resources/providers";
 import { buildPrompt, ITEM_TYPE_LABELS, LEVELS, type ItemTypeKey, type PromptMode } from "@/lib/questionBank/prompts";
 import { MEDIA_PROVIDERS, parseExerciseJson } from "@/server/questionBank/validation";
 import { KIND_LABELS, type ExerciseKind, type ExerciseListItem } from "@/server/questionBank/types";
-import { useCreateExercise, useUpdateExercise } from "../hooks";
+import { uniqueTopics, useCreateExercise, useExercises, useUpdateExercise } from "../hooks";
 import { ExercisePreview } from "./ExercisePreview";
 
 type Step = "tipo" | "medio" | "ia" | "pegar";
@@ -72,6 +72,8 @@ export interface ExerciseEditorModalProps {
 
 /** Asistente paso a paso: tipo -> (audio/video) -> instrucciones para la IA -> pegar y guardar. */
 export function ExerciseEditorModal({ open, onClose, exercise, initialKind }: ExerciseEditorModalProps) {
+  const { data: bank } = useExercises();
+  const topicSuggestions = React.useMemo(() => uniqueTopics(bank ?? []), [bank]);
   const create = useCreateExercise();
   const update = useUpdateExercise();
   const [step, setStep] = React.useState<Step>("tipo");
@@ -93,7 +95,8 @@ export function ExerciseEditorModal({ open, onClose, exercise, initialKind }: Ex
     setKind(exercise?.kind ?? initialKind ?? "exercise");
     setStep(exercise ? (exercise.kind === "listening" ? "medio" : "pegar") : initialKind ? (initialKind === "listening" ? "medio" : "ia") : "tipo");
     setMode("format");
-    setTopic("");
+    setLevel(c?.level && LEVELS.includes(c.level) ? c.level : "A2");
+    setTopic(c?.topic ?? "");
     setRaw(exercise ? JSON.stringify(c, null, 2) : "");
     setMediaUrl(c?.kind === "listening" ? c.audio_url : "");
     setMediaType(c?.kind === "listening" ? (c.media_type ?? "audio") : "audio");
@@ -138,8 +141,10 @@ export function ExerciseEditorModal({ open, onClose, exercise, initialKind }: Ex
   const save = () => {
     if (!check?.ok) return;
     const onSuccess = () => onClose();
-    if (exercise) update.mutate({ id: exercise.id, content: check.content }, { onSuccess });
-    else create.mutate(check.content, { onSuccess });
+    // Nivel y tema los define el docente en el formulario, no lo que devuelva la IA.
+    const content = { ...check.content, level, topic: topic.trim() || undefined };
+    if (exercise) update.mutate({ id: exercise.id, content }, { onSuccess });
+    else create.mutate(content, { onSuccess });
   };
 
   const canNext = step === "medio" ? mediaValid : true;
@@ -301,6 +306,19 @@ export function ExerciseEditorModal({ open, onClose, exercise, initialKind }: Ex
         {step === "pegar" && (
           <>
             <h2 style={h2}>{exercise ? "Contenido del ejercicio" : "Pega aquí la respuesta de la IA"}</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)" }}>
+              <Field label="Nivel">
+                <Select value={level} options={LEVELS} onChange={(e) => setLevel(e.target.value)} />
+              </Field>
+              <Field label="Tema" hint="Sirve para agrupar y filtrar al asignar. Ej: Pasado simple, Viajes.">
+                <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Escribe o elige un tema" list="exercise-topics" />
+                <datalist id="exercise-topics">
+                  {topicSuggestions.map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
+              </Field>
+            </div>
             <Textarea
               rows={check?.ok ? 5 : 9}
               value={raw}

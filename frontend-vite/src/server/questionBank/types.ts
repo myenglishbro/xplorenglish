@@ -21,6 +21,7 @@ export type PublicExerciseContent = {
   title: string;
   instructions?: string;
   level?: string;
+  topic?: string;
   prompt?: string;
   min_words?: number;
   max_seconds?: number;

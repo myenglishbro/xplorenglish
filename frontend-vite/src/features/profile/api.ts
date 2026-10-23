@@ -7,6 +7,8 @@ export interface UpdateProfileNameInput {
   firstName: string;
   lastName: string;
   phone: string;
+  /** Solo si viene (undefined = no tocar): la foto es opcional y solo la edita el docente. */
+  photoUrl?: string | null;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface UpdateProfileNameInput {
 export async function updateMyProfileName(supabase: Client, profileId: string, input: UpdateProfileNameInput): Promise<void> {
   const { error } = await supabase
     .from("profiles")
-    .update({ first_name: input.firstName, last_name: input.lastName, phone: input.phone })
+    .update({ first_name: input.firstName, last_name: input.lastName, phone: input.phone, ...(input.photoUrl !== undefined ? { photo_url: input.photoUrl } : {}) })
     .eq("id", profileId);
   if (error) throw error;
 }

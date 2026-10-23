@@ -50,6 +50,144 @@ export type Database = {
           },
         ]
       }
+      activity_answer_keys: {
+        Row: {
+          activity_id: number
+          answer_key: Json
+        }
+        Insert: {
+          activity_id: number
+          answer_key?: Json
+        }
+        Update: {
+          activity_id?: number
+          answer_key?: Json
+        }
+        Relationships: []
+      }
+      activity_submissions: {
+        Row: {
+          activity_id: number
+          answers: Json | null
+          audio_path: string | null
+          classroom_id: number
+          feedback: string | null
+          feedback_at: string | null
+          feedback_by: string | null
+          id: number
+          max_score: number | null
+          results: Json | null
+          score: number | null
+          student_id: string
+          submitted_at: string
+          text_response: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      classroom_activities: {
+        Row: {
+          assigned_by: string
+          classroom_id: number
+          content: Json
+          created_at: string
+          due_at: string | null
+          exercise_id: number | null
+          id: number
+          kind: string
+          title: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      exercises: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by: string
+          id: number
+          kind: string
+          level: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: Json
+          created_at?: string
+          created_by: string
+          id?: never
+          kind: string
+          level?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: Json
+          kind?: string
+          level?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: number
+          link: string | null
+          read_at: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      classroom_reports: {
+        Row: {
+          author_id: string
+          classroom_id: number
+          comments: string | null
+          created_at: string
+          id: number
+          listening_comment: string | null
+          published: boolean
+          published_at: string | null
+          reading_comment: string | null
+          speaking_comment: string | null
+          summary: string | null
+          title: string
+          updated_at: string
+          writing_comment: string | null
+        }
+        Insert: {
+          author_id: string
+          classroom_id: number
+          comments?: string | null
+          listening_comment?: string | null
+          published?: boolean
+          reading_comment?: string | null
+          speaking_comment?: string | null
+          summary?: string | null
+          title: string
+          writing_comment?: string | null
+        }
+        Update: {
+          comments?: string | null
+          listening_comment?: string | null
+          published?: boolean
+          reading_comment?: string | null
+          speaking_comment?: string | null
+          summary?: string | null
+          title?: string
+          writing_comment?: string | null
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -660,6 +798,7 @@ export type Database = {
           level: Database["public"]["Enums"]["academic_level"]
           must_change_password: boolean
           phone: string
+          photo_url: string | null
           program_id: number | null
           role: Database["public"]["Enums"]["user_role"]
           status: string
@@ -675,6 +814,7 @@ export type Database = {
           level?: Database["public"]["Enums"]["academic_level"]
           must_change_password?: boolean
           phone: string
+          photo_url?: string | null
           program_id?: number | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: string
@@ -690,6 +830,7 @@ export type Database = {
           level?: Database["public"]["Enums"]["academic_level"]
           must_change_password?: boolean
           phone?: string
+          photo_url?: string | null
           program_id?: number | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: string
@@ -1045,6 +1186,7 @@ export type Database = {
           level: Database["public"]["Enums"]["academic_level"]
           must_change_password: boolean
           phone: string
+          photo_url: string | null
           program_id: number | null
           role: Database["public"]["Enums"]["user_role"]
           status: string
@@ -1097,6 +1239,7 @@ export type Database = {
           level: Database["public"]["Enums"]["academic_level"]
           must_change_password: boolean
           phone: string
+          photo_url: string | null
           program_id: number | null
           role: Database["public"]["Enums"]["user_role"]
           status: string
@@ -1163,6 +1306,7 @@ export type Database = {
           level: Database["public"]["Enums"]["academic_level"]
           must_change_password: boolean
           phone: string
+          photo_url: string | null
           program_id: number | null
           role: Database["public"]["Enums"]["user_role"]
           status: string
@@ -1187,6 +1331,7 @@ export type Database = {
           level: Database["public"]["Enums"]["academic_level"]
           must_change_password: boolean
           phone: string
+          photo_url: string | null
           program_id: number | null
           role: Database["public"]["Enums"]["user_role"]
           status: string
@@ -1198,6 +1343,102 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      assign_exercise: {
+        Args: { p_classroom_id: number; p_due_at?: string; p_exercise_id: number }
+        Returns: {
+          assigned_by: string
+          classroom_id: number
+          content: Json
+          created_at: string
+          due_at: string | null
+          exercise_id: number | null
+          id: number
+          kind: string
+          title: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "classroom_activities"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      delete_classroom_activity: {
+        Args: { p_activity_id: number }
+        Returns: string[]
+      }
+      submit_activity: {
+        Args: { p_activity_id: number; p_answers?: Json; p_audio_path?: string; p_text?: string }
+        Returns: {
+          activity_id: number
+          answers: Json | null
+          audio_path: string | null
+          classroom_id: number
+          feedback: string | null
+          feedback_at: string | null
+          feedback_by: string | null
+          id: number
+          max_score: number | null
+          results: Json | null
+          score: number | null
+          student_id: string
+          submitted_at: string
+          text_response: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "activity_submissions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      give_submission_feedback: {
+        Args: { p_feedback: string; p_submission_id: number }
+        Returns: {
+          activity_id: number
+          answers: Json | null
+          audio_path: string | null
+          classroom_id: number
+          feedback: string | null
+          feedback_at: string | null
+          feedback_by: string | null
+          id: number
+          max_score: number | null
+          results: Json | null
+          score: number | null
+          student_id: string
+          submitted_at: string
+          text_response: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "activity_submissions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_clear_classroom_recordings: {
+        Args: { p_classroom_id: number }
+        Returns: number
+      }
+      mark_all_notifications_read: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      mark_notification_read: {
+        Args: { p_id: number }
+        Returns: undefined
+      }
+      get_classroom_teachers_cards: {
+        Args: { p_classroom_ids: number[] }
+        Returns: {
+          classroom_id: number
+          first_name: string
+          last_name: string
+          photo_url: string | null
+          teacher_id: string
+        }[]
       }
       admin_set_classroom_status: {
         Args: { p_classroom_id: number; p_reason?: string; p_status: string }
@@ -1249,6 +1490,7 @@ export type Database = {
           level: Database["public"]["Enums"]["academic_level"]
           must_change_password: boolean
           phone: string
+          photo_url: string | null
           program_id: number | null
           role: Database["public"]["Enums"]["user_role"]
           status: string
@@ -1359,6 +1601,7 @@ export type Database = {
           level: Database["public"]["Enums"]["academic_level"]
           must_change_password: boolean
           phone: string
+          photo_url: string | null
           program_id: number | null
           role: Database["public"]["Enums"]["user_role"]
           status: string

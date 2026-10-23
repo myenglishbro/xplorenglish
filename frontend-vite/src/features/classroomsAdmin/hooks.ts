@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/queryKeys";
+import { removeRecordings } from "@/lib/storage/recordings";
 import { listClassrooms, getClassroomDetail, listAssignableTeachers, listAssignableStudents } from "@/server/admin/classrooms/queries";
 import { getTeacherAvailabilityByIds, getTeacherOccupiedBlocksByIds, getTeacherSkillNamesByIds } from "@/server/admin/teachers/queries";
 import { classroomSchema, type ClassroomInput } from "@/server/admin/classrooms/validation";
@@ -125,6 +126,27 @@ function parseClassroomStatusRpcError(error: { message: string }): Error {
   return new Error(CLASSROOM_STATUS_RPC_ERROR_MESSAGES[code] ?? "No pudimos actualizar el estado del salón. Inténtalo de nuevo en unos minutos.");
 }
 
+/** Al archivar un salón se eliminan las grabaciones de speaking (decisión de producto). El salón ya
+ * quedó archivado y Storage deja de servir esos audios a docentes/estudiantes (policy 0048 exige
+ * salón activo), así que un fallo acá no se propaga: solo deja archivos huérfanos que un reintento
+ * (reactivar y volver a archivar) limpia, y no debe presentarse como fallo de "finalizar". */
+async function deleteClassroomRecordings(classroomId: number): Promise<void> {
+  try {
+    const { data } = await supabase
+      .from("activity_submissions")
+      .select("audio_path")
+      .eq("classroom_id", classroomId)
+      .not("audio_path", "is", null);
+    const paths = (data ?? []).map((r) => r.audio_path).filter((p): p is string => !!p);
+    if (paths.length === 0) return;
+    if (await removeRecordings(supabase, paths)) {
+      await supabase.rpc("admin_clear_classroom_recordings", { p_classroom_id: classroomId });
+    }
+  } catch {
+    // Ver comentario de la función.
+  }
+}
+
 /** admin_set_classroom_status (0044) -- ya NO es un UPDATE directo del browser: finalizar/
  * reactivar un salón es una acción operativa importante, con la misma autoridad/auditoría
  * (audit_logs, CLASSROOM_ARCHIVED/CLASSROOM_RESTORED) que admin_archive_user/admin_restore_user.
@@ -136,8 +158,12 @@ export function useSetClassroomStatus(classroomId: number) {
     mutationFn: async (status: "active" | "archived") => {
       const { error } = await supabase.rpc("admin_set_classroom_status", { p_classroom_id: classroomId, p_status: status });
       if (error) throw parseClassroomStatusRpcError(error);
+      if (status === "archived") await deleteClassroomRecordings(classroomId);
     },
-    onSuccess: () => invalidateClassroomQueries(queryClient, classroomId),
+    onSuccess: () => {
+      invalidateClassroomQueries(queryClient, classroomId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.classroomSubmissions(classroomId) });
+    },
   });
 }
 

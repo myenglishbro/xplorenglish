@@ -7,6 +7,33 @@ import { listMyClassroomsAsStudent } from "@/server/student/classrooms/queries";
 import { getMyWeeklyScheduleAsTeacher } from "@/server/teacher/schedule/queries";
 import { getMyWeeklyScheduleAsStudent } from "@/server/student/schedule/queries";
 
+export interface ClassroomTeacherCard {
+  id: string;
+  firstName: string;
+  lastName: string;
+  photoUrl: string | null;
+}
+
+/** Docentes habilitados (nombre + foto) por salón, en una sola llamada para todo el listado. */
+export function useClassroomTeachersCards(classroomIds: number[]) {
+  return useQuery({
+    queryKey: queryKeys.classroomTeachersCards(classroomIds),
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_classroom_teachers_cards", { p_classroom_ids: classroomIds });
+      if (error) throw error;
+      const byClassroom = new Map<number, ClassroomTeacherCard[]>();
+      for (const r of data) {
+        const list = byClassroom.get(r.classroom_id) ?? [];
+        list.push({ id: r.teacher_id, firstName: r.first_name, lastName: r.last_name, photoUrl: r.photo_url });
+        byClassroom.set(r.classroom_id, list);
+      }
+      return byClassroom;
+    },
+    enabled: classroomIds.length > 0,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useMyClassroomsAsTeacher() {
   const { user } = useAuth();
   return useQuery({

@@ -1,7 +1,7 @@
 import React from "react";
 
 export interface FieldProps {
-  label?: string;
+  label?: React.ReactNode;
   hint?: string;
   /** When present, replaces the hint and turns it red. */
   error?: string;

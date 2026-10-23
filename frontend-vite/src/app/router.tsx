@@ -13,6 +13,7 @@ import { TeacherGuidelinesPage } from "@/pages/TeacherGuidelinesPage";
 import { LevelTestPage } from "@/pages/LevelTestPage";
 import { WelcomeKitPage } from "@/pages/WelcomeKitPage";
 import { AuditLogPage } from "@/pages/admin/AuditLogPage";
+import { QuestionBankPage } from "@/pages/QuestionBankPage";
 
 import { DashboardPage } from "@/pages/admin/DashboardPage";
 import { UsersListPage } from "@/pages/admin/UsersListPage";
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
       { path: "disponibilidad", element: <AvailabilityPage /> },
       { path: "salones", element: <TeacherSalonesPage /> },
       { path: "salones/:id", element: <SalonDetailPage role="teacher" /> },
+      { path: "banco-preguntas", element: <QuestionBankPage /> },
       { path: "pagos", element: <TeacherPagosPage /> },
       { path: "perfil", element: <TeacherPerfilPage /> },
       { path: "politicas", element: <PoliciesPage /> },
@@ -102,6 +104,7 @@ export const router = createBrowserRouter([
       { path: "salones", element: <SalonesPage /> },
       { path: "salones/nuevo", element: <NuevoSalonPage /> },
       { path: "salones/:id", element: <SalonDetailAdminPage /> },
+      { path: "banco-preguntas", element: <QuestionBankPage /> },
       { path: "paquetes", element: <PaquetesPage /> },
       { path: "paquetes/:studentId", element: <EstudianteHorasDetailPage /> },
       { path: "pagos-estudiantes", element: <PagosEstudiantesListPage /> },

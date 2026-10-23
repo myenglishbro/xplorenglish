@@ -16,12 +16,14 @@ export interface TopBarProps {
   children?: React.ReactNode;
   user?: TopBarUser;
   notifications?: number;
+  /** Reemplaza la campana estática (p. ej. por un componente con notificaciones reales). */
+  notificationSlot?: React.ReactNode;
   /** Shows a hamburger for compact layouts. */
   onMenu?: () => void;
   style?: React.CSSProperties;
 }
 
-export function TopBar({ title, subtitle, children, user, notifications, onMenu, style }: TopBarProps) {
+export function TopBar({ title, subtitle, children, user, notifications, notificationSlot, onMenu, style }: TopBarProps) {
   return (
     <header
       style={{
@@ -56,10 +58,12 @@ export function TopBar({ title, subtitle, children, user, notifications, onMenu,
       </div>
       <div style={{ flex: "0 0 auto", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
         {children}
-        <span style={{ position: "relative", display: "inline-flex" }}>
-          <IconButton icon="bell" label="Notificaciones" />
-          {notifications ? <Badge style={{ position: "absolute", top: -2, right: -4 }}>{notifications}</Badge> : null}
-        </span>
+        {notificationSlot ?? (
+          <span style={{ position: "relative", display: "inline-flex" }}>
+            <IconButton icon="bell" label="Notificaciones" />
+            {notifications ? <Badge style={{ position: "absolute", top: -2, right: -4 }}>{notifications}</Badge> : null}
+          </span>
+        )}
         {user && <Avatar name={user.name} src={user.src} size={38} subtitle={user.role} />}
       </div>
     </header>

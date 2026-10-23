@@ -26,10 +26,16 @@ export function useMyStudentProfile() {
 
 function useUpdateProfileName(invalidateKey: readonly unknown[]) {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   return useMutation({
     mutationFn: (input: UpdateProfileNameInput) => updateMyProfileName(supabase, user!.id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: invalidateKey }),
+    onSuccess: () => {
+      // El perfil en sesión alimenta la barra superior (nombre y foto): se recarga para verlo al instante.
+      void refreshProfile();
+      queryClient.invalidateQueries({ queryKey: invalidateKey });
+      // La foto/nombre también se ven en las tarjetas de salón.
+      queryClient.invalidateQueries({ queryKey: ["classroom-teachers-cards"] });
+    },
   });
 }
 

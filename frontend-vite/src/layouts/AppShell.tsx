@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { SidebarNav, type SidebarNavItem } from "@/components/ui/navigation/SidebarNav";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { TopBar } from "@/components/ui/navigation/TopBar";
 import { Button } from "@/components/ui/core/Button";
 import { supabase } from "@/lib/supabase";
@@ -17,6 +18,8 @@ export interface AppShellProfile {
   first_name: string;
   last_name: string;
   role: UserRole;
+  /** profiles.photo_url (0053) -- se muestra en la barra superior; sin foto, iniciales. */
+  photo_url?: string | null;
 }
 
 export interface AppShellProps {
@@ -102,7 +105,8 @@ export function AppShell({ profile, navItems, children }: AppShellProps) {
         <TopBar
           title={fullName}
           subtitle={ROLE_LABEL[profile.role]}
-          user={{ name: fullName, role: ROLE_LABEL[profile.role] }}
+          user={{ name: fullName, role: ROLE_LABEL[profile.role], src: profile.photo_url ?? undefined }}
+          notificationSlot={<NotificationBell />}
           onMenu={isDesktop ? undefined : () => setMobileNavOpen(true)}
         />
         <main style={{ flex: 1, minWidth: 0, padding: isDesktop ? "var(--space-6)" : "var(--space-4)", overflowY: "auto" }}>{children}</main>

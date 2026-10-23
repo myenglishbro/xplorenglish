@@ -1,14 +1,14 @@
 import React from "react";
-import { Link, useParams } from "react-router-dom";
-import { useAuth } from "@/auth/useAuth";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useClassroomHeader, useContentTree } from "@/features/content/hooks";
 import { useClassroomPeople } from "@/features/classroomOverview/hooks";
 import { useClassroomBalance } from "@/features/classRecords/hooks";
 import { ClassroomInfoCard } from "@/features/classroomOverview/components/ClassroomInfoCard";
 import { ClassroomClassesSection } from "@/features/classRecords/components/ClassroomClassesSection";
 import { CourseViewer } from "@/components/student/content/CourseViewer";
-import { ContentEditor } from "@/components/content/ContentEditor";
-import { Card } from "@/components/ui/surfaces/Card";
+import { TeacherSalonView } from "@/features/classroomOverview/components/TeacherSalonView";
+import { ClassroomReportsSection } from "@/features/classroomReports/components/ClassroomReportsSection";
+import { ClassroomActivitiesSection } from "@/features/activities/components/ClassroomActivitiesSection";
 import { Icon } from "@/components/ui/core/Icon";
 import { Tag } from "@/components/ui/core/Tag";
 import { Tabs } from "@/components/ui/navigation/Tabs";
@@ -16,7 +16,7 @@ import { Spinner } from "@/components/ui/feedback/Spinner";
 import { Alert } from "@/components/ui/feedback/Alert";
 import type { ModuleItem } from "@/server/classrooms/content/types";
 
-type StudentTab = "contenido" | "info";
+type StudentTab = "contenido" | "actividades" | "reportes" | "info";
 
 /**
  * Slice F.1: la vista Student de un salón se separa en 2 pestañas para que el contenido del curso
@@ -42,13 +42,20 @@ function StudentSalonView({
   modules: ModuleItem[];
   hasStudent: boolean;
 }) {
-  const [tab, setTab] = React.useState<StudentTab>("contenido");
+  // `?tab=` permite que los enlaces de las notificaciones abran directo en "Actividades".
+  const [params] = useSearchParams();
+  const [tab, setTab] = React.useState<StudentTab>(() => {
+    const requested = params.get("tab");
+    return requested === "actividades" || requested === "reportes" || requested === "info" ? requested : "contenido";
+  });
   const balanceQuery = useClassroomBalance(classroomId);
 
   const tabsControl = (
     <Tabs
       items={[
         { value: "contenido", label: "Contenido" },
+        { value: "actividades", label: "Actividades" },
+        { value: "reportes", label: "Reportes" },
         { value: "info", label: "Información del salón" },
       ]}
       value={tab}
@@ -101,8 +108,16 @@ function StudentSalonView({
         {tabsControl}
       </div>
 
-      <ClassroomInfoCard classroomId={classroomId} role="student" />
-      <ClassroomClassesSection classroomId={classroomId} hasStudent={hasStudent} role="student" />
+      {tab === "actividades" ? (
+        <ClassroomActivitiesSection classroomId={classroomId} role="student" />
+      ) : tab === "reportes" ? (
+        <ClassroomReportsSection classroomId={classroomId} role="student" />
+      ) : (
+        <>
+          <ClassroomInfoCard classroomId={classroomId} role="student" />
+          <ClassroomClassesSection classroomId={classroomId} hasStudent={hasStudent} role="student" />
+        </>
+      )}
     </div>
   );
 }
@@ -118,7 +133,6 @@ function StudentSalonView({
 export function SalonDetailPage({ role }: { role: "teacher" | "student" }) {
   const { id } = useParams<{ id: string }>();
   const classroomId = Number(id);
-  const { user } = useAuth();
 
   const headerQuery = useClassroomHeader(role, classroomId);
   const contentQuery = useContentTree(classroomId);
@@ -158,45 +172,13 @@ export function SalonDetailPage({ role }: { role: "teacher" | "student" }) {
     );
   }
 
-  const classroom = headerQuery.data;
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-      <div>
-        <Link
-          to="/teacher/salones"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, font: "var(--weight-semibold) 13px/1 var(--font-body)", color: "var(--text-muted)", textDecoration: "none" }}
-        >
-          <Icon name="arrow-left" size={14} /> Volver a Mis salones
-        </Link>
-        <h1
-          style={{
-            font: "var(--weight-bold) var(--text-h2-size)/var(--text-h2-lh) var(--font-display)",
-            letterSpacing: "var(--text-h2-ls)",
-            color: "var(--text-heading)",
-            margin: "8px 0 0",
-          }}
-        >
-          {classroom.name}
-        </h1>
-        <p style={{ margin: "4px 0 0", color: "var(--text-muted)" }}>
-          {classroom.programName ?? "—"} · Nivel {classroom.level}
-        </p>
-      </div>
-
-      <ClassroomInfoCard classroomId={classroomId} role="teacher" />
-
-      <ClassroomClassesSection classroomId={classroomId} hasStudent={hasStudent} role="teacher" currentTeacherId={user?.id} />
-
-      <Card
-        header={
-          <h2 style={{ margin: 0, font: "var(--weight-bold) var(--text-h4-size)/var(--text-h4-lh) var(--font-display)", color: "var(--text-heading)" }}>
-            Contenido del salón
-          </h2>
-        }
-      >
-        <ContentEditor classroomId={classroomId} modules={contentQuery.data ?? []} />
-      </Card>
-    </div>
+    <TeacherSalonView
+      classroomId={classroomId}
+      name={headerQuery.data.name}
+      programName={headerQuery.data.programName}
+      level={headerQuery.data.level}
+      modules={contentQuery.data ?? []}
+    />
   );
 }

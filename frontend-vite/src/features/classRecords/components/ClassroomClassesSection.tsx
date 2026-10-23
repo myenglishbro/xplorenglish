@@ -20,6 +20,8 @@ export interface ClassroomClassesSectionProps {
   /** Solo Teacher registra clases y ve "Corregir" en sus propias filas. */
   role: "teacher" | "student" | "admin";
   currentTeacherId?: string;
+  /** El botón "Registrar clase" ya vive en el encabezado del salón (vista del docente). */
+  hideRegister?: boolean;
 }
 
 /**
@@ -28,7 +30,7 @@ export interface ClassroomClassesSectionProps {
  * get_classroom_student_balance. Sin alertas globales todavía (Slice G) -- solo el dato dentro del
  * salón, como pide el slice.
  */
-export function ClassroomClassesSection({ classroomId, hasStudent, role, currentTeacherId }: ClassroomClassesSectionProps) {
+export function ClassroomClassesSection({ classroomId, hasStudent, role, currentTeacherId, hideRegister }: ClassroomClassesSectionProps) {
   const balanceQuery = useClassroomBalance(classroomId);
   const historyQuery = useClassroomHistory(classroomId);
 
@@ -44,9 +46,9 @@ export function ClassroomClassesSection({ classroomId, hasStudent, role, current
             </span>
             <Tag tone={balance.tone}>{balance.label}</Tag>
           </div>
-          {role === "teacher" && <RegisterClassButton classroomId={classroomId} disabled={!hasStudent} />}
+          {role === "teacher" && !hideRegister && <RegisterClassButton classroomId={classroomId} disabled={!hasStudent} />}
         </div>
-        {role === "teacher" && !hasStudent && (
+        {role === "teacher" && !hideRegister && !hasStudent && (
           <Alert tone="warning" style={{ marginTop: "var(--space-3)" }}>
             Este salón no tiene un estudiante asignado -- no se pueden registrar clases PRESENTE/AUSENTE hasta que Admin asigne uno.
           </Alert>

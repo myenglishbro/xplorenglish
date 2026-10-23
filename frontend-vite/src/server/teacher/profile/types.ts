@@ -17,6 +17,8 @@ export interface MyTeacherProfile {
    * como editable. */
   dni: string;
   phone: string;
+  /** profiles.photo_url (0053) -- URL https de la foto; null si no cargó ninguna. */
+  photoUrl: string | null;
   /** null si el docente todavía no tiene fila en teacher_profiles (no debería ocurrir para un
    * role='teacher' real, pero la query no lo asume). */
   teacherProfile: MyTeacherProfileSummary | null;

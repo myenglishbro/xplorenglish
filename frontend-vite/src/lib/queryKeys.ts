@@ -58,4 +58,13 @@ export const queryKeys = {
   institutionalDocuments: (documentType: InstitutionalDocumentType) => ["institutional-documents", documentType] as const,
   institutionalDocumentsAdmin: (documentType: InstitutionalDocumentType) => ["institutional-documents-admin", documentType] as const,
   adminAuditLogs: () => ["admin-audit-logs"] as const,
+  /** Banco de preguntas compartido (docentes + admin) y actividades/entregas por salón. */
+  /** Campana de notificaciones del usuario autenticado. */
+  notifications: (userId?: string) => ["notifications", userId] as const,
+  /** Docentes (nombre + foto) de un lote de salones, para las tarjetas de "Mis salones". */
+  classroomTeachersCards: (ids: number[]) => ["classroom-teachers-cards", [...ids].sort((a, b) => a - b)] as const,
+  classroomReports: (classroomId: number) => ["classroom-reports", classroomId] as const,
+  exercises: () => ["exercises"] as const,
+  classroomActivities: (classroomId: number) => ["classroom-activities", classroomId] as const,
+  classroomSubmissions: (classroomId: number) => ["classroom-submissions", classroomId] as const,
 };

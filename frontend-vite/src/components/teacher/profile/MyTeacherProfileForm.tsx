@@ -5,6 +5,8 @@ import { Field } from "@/components/ui/forms/Field";
 import { Input } from "@/components/ui/forms/Input";
 import { Button } from "@/components/ui/core/Button";
 import { Alert } from "@/components/ui/feedback/Alert";
+import { Avatar } from "@/components/ui/surfaces/Avatar";
+import { normalizePhotoUrl } from "@/lib/images/photoUrl";
 import { useUpdateMyTeacherProfile } from "@/features/profile/hooks";
 import { updateMyTeacherProfileSchema, type UpdateMyTeacherProfileInput } from "@/server/teacher/profile/validation";
 import type { MyTeacherProfile } from "@/server/teacher/profile/types";
@@ -19,6 +21,7 @@ export function MyTeacherProfileForm({ profile }: MyTeacherProfileFormProps) {
   const [firstName, setFirstName] = React.useState(profile.firstName);
   const [lastName, setLastName] = React.useState(profile.lastName);
   const [phone, setPhone] = React.useState(profile.phone);
+  const [photoUrl, setPhotoUrl] = React.useState(profile.photoUrl ?? "");
   const [fieldErrors, setFieldErrors] = React.useState<FieldErrors>({});
   const [error, setError] = React.useState<string | undefined>();
   const [saved, setSaved] = React.useState(false);
@@ -31,7 +34,7 @@ export function MyTeacherProfileForm({ profile }: MyTeacherProfileFormProps) {
     setFieldErrors({});
     setSaved(false);
 
-    const parsed = updateMyTeacherProfileSchema.safeParse({ firstName, lastName, phone });
+    const parsed = updateMyTeacherProfileSchema.safeParse({ firstName, lastName, phone, photoUrl });
     if (!parsed.success) {
       const errs: FieldErrors = {};
       for (const issue of parsed.error.issues) {
@@ -54,6 +57,29 @@ export function MyTeacherProfileForm({ profile }: MyTeacherProfileFormProps) {
     <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {error && <Alert tone="danger">{error}</Alert>}
       {saved && <Alert tone="success">Los cambios se guardaron correctamente.</Alert>}
+
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-4)" }}>
+        <Avatar name={`${firstName} ${lastName}`} src={photoUrl.trim() ? (normalizePhotoUrl(photoUrl) ?? undefined) : undefined} size={80} />
+        <div style={{ flex: "1 1 260px" }}>
+          <Field
+            label="Foto de perfil (enlace)"
+            htmlFor="photoUrl"
+            error={fieldErrors.photoUrl}
+            hint='Tus estudiantes la verán en tus salones. Pega el enlace de una imagen. Si la tienes en Google Drive: clic derecho → Compartir → "Cualquier persona con el enlace" → Copiar enlace.'
+          >
+            <Input id="photoUrl" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://…" disabled={updateProfile.isPending} />
+          </Field>
+          {photoUrl && (
+            <button
+              type="button"
+              onClick={() => setPhotoUrl("")}
+              style={{ marginTop: 6, border: 0, background: "none", padding: 0, cursor: "pointer", color: "var(--danger-fg)", font: "var(--weight-semibold) 13px/1 var(--font-body)" }}
+            >
+              Quitar foto
+            </button>
+          )}
+        </div>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--space-4)" }}>
         <Field label="Nombre" required htmlFor="firstName" error={fieldErrors.firstName}>

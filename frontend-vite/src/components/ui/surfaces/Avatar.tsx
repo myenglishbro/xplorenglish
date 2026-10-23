@@ -24,10 +24,13 @@ function initials(name?: string): string {
 }
 
 export function Avatar({ name, src, size = 36, subtitle, tone = "accent", style }: AvatarProps) {
+  // Si la imagen no carga (enlace roto o archivo privado) se muestran las iniciales, no un icono roto.
+  const [broken, setBroken] = React.useState<string | undefined>();
+  const showImage = !!src && broken !== src;
   const bg = tone === "brand" ? "var(--orange-100)" : tone === "neutral" ? "var(--neutral-100)" : "var(--cyan-100)";
   const fg = tone === "brand" ? "var(--orange-700)" : tone === "neutral" ? "var(--neutral-700)" : "var(--cyan-700)";
-  const mark = src ? (
-    <img src={src} alt={name} style={{ width: size, height: size, borderRadius: "var(--radius-pill)", objectFit: "cover", display: "block" }} />
+  const mark = showImage ? (
+    <img src={src} alt={name} referrerPolicy="no-referrer" onError={() => setBroken(src)} style={{ width: size, height: size, borderRadius: "var(--radius-pill)", objectFit: "cover", display: "block" }} />
   ) : (
     <span
       style={{

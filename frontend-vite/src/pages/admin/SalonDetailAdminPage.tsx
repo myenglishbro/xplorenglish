@@ -16,6 +16,8 @@ import { ClassroomTeachersPanel } from "@/components/admin/classrooms/ClassroomT
 import { ClassroomStudentPanel } from "@/components/admin/classrooms/ClassroomStudentPanel";
 import { WeeklyScheduleList } from "@/components/admin/scheduling/WeeklyScheduleList";
 import { ContentEditor } from "@/components/content/ContentEditor";
+import { ClassroomReportsSection } from "@/features/classroomReports/components/ClassroomReportsSection";
+import { ClassroomActivitiesSection } from "@/features/activities/components/ClassroomActivitiesSection";
 
 function cardTitle(text: string) {
   return (
@@ -102,7 +104,7 @@ export function SalonDetailAdminPage() {
           <Card header={cardTitle("Estado")}>
             <ClassroomStatusToggle classroomId={classroom.id} status={classroom.status} />
             <p style={{ marginTop: "var(--space-3)", font: "var(--weight-regular) var(--text-caption-size)/1.4 var(--font-body)", color: "var(--text-muted)" }}>
-              Finalizar no borra ni desactiva al estudiante ni a los profesores asignados -- solo saca el salón de la operación diaria. El historial de clases y pagos se conserva.
+              Finalizar no borra ni desactiva al estudiante ni a los profesores asignados -- solo saca el salón de la operación diaria. El historial de clases y pagos se conserva. Las grabaciones de speaking de los estudiantes sí se eliminan.
             </p>
           </Card>
 
@@ -132,6 +134,14 @@ export function SalonDetailAdminPage() {
           <ClassroomClassesSection classroomId={classroom.id} hasStudent={!!classroom.student} role="admin" />
         </div>
       </div>
+
+      <Card header={cardTitle("Actividades")}>
+        <ClassroomActivitiesSection classroomId={classroom.id} role="admin" archived={classroom.status !== "active"} />
+      </Card>
+
+      <Card header={cardTitle("Reportes del docente")}>
+        <ClassroomReportsSection classroomId={classroom.id} role="admin" />
+      </Card>
 
       <Card header={cardTitle("Contenido del salón")}>
         {contentQuery.isLoading ? (

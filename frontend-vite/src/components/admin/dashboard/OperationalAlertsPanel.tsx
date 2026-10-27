@@ -1,19 +1,44 @@
+import React from "react";
 import { Link } from "react-router-dom";
-import { Alert } from "@/components/ui/feedback/Alert";
-import { Tag } from "@/components/ui/core/Tag";
+import { Icon } from "@/components/ui/core/Icon";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
-import { getStudentBalanceStatus } from "@/lib/hours/balanceStatus";
+import { classifyStudentBalance } from "@/lib/hours/balanceStatus";
+import { formatMinutesAsHours } from "@/lib/format/minutes";
 import type { StudentBalanceAlertItem } from "@/server/balanceAlerts/types";
 import type { DashboardAlert } from "@/server/dashboard/types";
 
-const LINK_STYLE = { font: "var(--weight-bold) 12.5px/1 var(--font-body)", color: "var(--text-body)" } as const;
+const VISIBLE_ROWS = 5;
+const LINK_STYLE = { font: "var(--weight-bold) 12.5px/1 var(--font-body)", color: "var(--text-body)", whiteSpace: "nowrap" } as const;
+const ELLIPSIS = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } as const;
+
+type TabKey = "empty" | "low" | "operational";
+
+function Row({ accent, icon, title, subtitle, trailing, to, linkLabel }: { accent: string; icon: string; title: string; subtitle?: string | null; trailing?: string; to: string; linkLabel: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "8px 4px", borderBottom: "1px solid var(--border-subtle)" }}>
+      <span
+        aria-hidden
+        style={{ width: 30, height: 30, borderRadius: "50%", flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", background: `color-mix(in srgb, ${accent} 14%, transparent)` }}
+      >
+        <Icon name={icon} size={16} color={accent} />
+      </span>
+      <div style={{ minWidth: 0, flex: 1, display: "flex", alignItems: "baseline", gap: 8 }}>
+        <span style={{ font: "var(--weight-semibold) var(--text-body-sm-size)/1.2 var(--font-body)", color: "var(--text-heading)", ...ELLIPSIS }}>{title}</span>
+        {subtitle && <span style={{ font: "var(--weight-regular) 12px/1.2 var(--font-body)", color: "var(--text-muted)", ...ELLIPSIS }}>{subtitle}</span>}
+      </div>
+      {trailing && <span style={{ font: "var(--weight-bold) 12px/1 var(--font-body)", color: "var(--text-muted)", whiteSpace: "nowrap" }}>{trailing}</span>}
+      <Link to={to} style={{ ...LINK_STYLE, display: "inline-flex", alignItems: "center", gap: 4 }}>
+        {linkLabel}
+        <Icon name="caret-right" weight="bold" size={12} />
+      </Link>
+    </div>
+  );
+}
 
 /**
- * Panel único y compacto del Dashboard Admin -- combina las alertas de saldo (Slice G,
- * get_student_balance_alerts, ya viene ordenada SIN SALDO antes que SALDO BAJO) con las alertas
- * operativas existentes (salones sin profesor, clases pendientes de pago), en ese orden de
- * prioridad. Nunca una pared de mensajes: filas compactas, no una tabla ancha como
- * BalanceAlertsSection (pensada para una columna de 1/3 del dashboard, no para una página completa).
+ * Panel de alertas del Dashboard Admin, compacto: pestañas con contador (Sin saldo / Saldo bajo /
+ * Operativas), una lista a la vez, filas de una línea y "Ver todos" para pasar de las primeras filas.
+ * La lista de saldo ya excluye estudiantes archivados (get_student_balance_alerts, 0054).
  */
 export function OperationalAlertsPanel({
   balanceAlerts,
@@ -22,6 +47,19 @@ export function OperationalAlertsPanel({
   balanceAlerts: StudentBalanceAlertItem[];
   operationalAlerts: DashboardAlert[];
 }) {
+  const empty = balanceAlerts.filter((i) => classifyStudentBalance(i.balance) === "empty");
+  const low = balanceAlerts.filter((i) => classifyStudentBalance(i.balance) === "low");
+
+  const tabs: { key: TabKey; label: string; count: number; color: string; icon: string }[] = [
+    { key: "empty", label: "Sin saldo", count: empty.length, color: "var(--danger-solid)", icon: "battery-empty" },
+    { key: "low", label: "Saldo bajo", count: low.length, color: "var(--warning-fg)", icon: "battery-low" },
+    { key: "operational", label: "Operativas", count: operationalAlerts.length, color: "var(--text-body)", icon: "warning-circle" },
+  ];
+  const firstWithItems = tabs.find((t) => t.count > 0)?.key ?? "empty";
+  const [picked, setPicked] = React.useState<TabKey | null>(null);
+  const [expanded, setExpanded] = React.useState(false);
+  const active = tabs.find((t) => t.key === picked && t.count > 0)?.key ?? firstWithItems;
+
   if (balanceAlerts.length === 0 && operationalAlerts.length === 0) {
     return (
       <EmptyState icon="check-circle" title="Todo en orden">
@@ -30,61 +68,72 @@ export function OperationalAlertsPanel({
     );
   }
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-      {balanceAlerts.map((item) => {
-        const balanceStatus = getStudentBalanceStatus(item.balance);
-        return (
-          <div
-            key={item.studentId}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "var(--space-2)",
-              padding: "8px 10px",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "var(--radius-md)",
-            }}
-          >
-            <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-              <span style={{ font: "var(--weight-semibold) var(--text-body-sm-size)/1.2 var(--font-body)", color: "var(--text-heading)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {item.studentName}
-              </span>
-              <span style={{ font: "var(--weight-regular) 11.5px/1.2 var(--font-body)", color: "var(--text-muted)" }}>{item.balance} min</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
-              <Tag tone={balanceStatus.tone} size="sm">
-                {balanceStatus.label}
-              </Tag>
-              {item.classroomId ? (
-                <Link to={`/admin/salones/${item.classroomId}`} style={LINK_STYLE}>
-                  Ver salón →
-                </Link>
-              ) : (
-                <Link to={`/admin/paquetes/${item.studentId}`} style={LINK_STYLE}>
-                  Ver estudiante →
-                </Link>
-              )}
-            </div>
-          </div>
-        );
-      })}
+  const total = tabs.find((t) => t.key === active)!.count;
+  const hidden = !expanded && total > VISIBLE_ROWS;
+  const slice = <T,>(list: T[]) => (hidden ? list.slice(0, VISIBLE_ROWS) : list);
 
-      {operationalAlerts.map((alert) => (
-        <Alert
-          key={alert.kind}
-          tone="warning"
-          title={alert.label}
-          action={
-            <Link to={alert.href} style={LINK_STYLE}>
-              Ver detalle →
-            </Link>
-          }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+      <div role="tablist" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {tabs.map((t) => {
+          const selected = t.key === active;
+          return (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={selected}
+              disabled={t.count === 0}
+              onClick={() => {
+                setPicked(t.key);
+                setExpanded(false);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: `1px solid ${selected ? t.color : "var(--border-subtle)"}`,
+                background: selected ? "var(--surface-sunken)" : "transparent",
+                color: t.count === 0 ? "var(--text-muted)" : "var(--text-heading)",
+                opacity: t.count === 0 ? 0.55 : 1,
+                cursor: t.count === 0 ? "default" : "pointer",
+                font: "var(--weight-bold) 12.5px/1 var(--font-body)",
+              }}
+            >
+              <Icon name={t.icon} size={15} color={t.color} />
+              {t.label}
+              <span style={{ color: "var(--text-muted)" }}>{t.count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div>
+        {active === "operational"
+          ? slice(operationalAlerts).map((a) => <Row key={a.kind} accent="var(--warning-fg)" icon="warning" title={a.label} subtitle={a.detail} to={a.href} linkLabel="Ver detalle" />)
+          : slice(active === "empty" ? empty : low).map((item) => (
+              <Row
+                key={item.studentId}
+                accent={active === "empty" ? "var(--danger-solid)" : "var(--warning-fg)"}
+                icon={active === "empty" ? "battery-empty" : "battery-low"}
+                title={item.studentName}
+                subtitle={item.classroomName ?? "Sin salón activo"}
+                trailing={active === "low" ? formatMinutesAsHours(item.balance) : undefined}
+                to={item.classroomId ? `/admin/salones/${item.classroomId}` : `/admin/paquetes/${item.studentId}`}
+                linkLabel={item.classroomId ? "Ver salón" : "Ver estudiante"}
+              />
+            ))}
+      </div>
+
+      {total > VISIBLE_ROWS && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          style={{ alignSelf: "flex-start", background: "none", border: 0, padding: "4px 0", cursor: "pointer", font: "var(--weight-bold) 12.5px/1 var(--font-body)", color: "var(--text-body)" }}
         >
-          {alert.detail}
-        </Alert>
-      ))}
+          {expanded ? "Ver menos" : `Ver todos (${total})`}
+        </button>
+      )}
     </div>
   );
 }

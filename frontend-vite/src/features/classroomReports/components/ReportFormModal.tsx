@@ -111,17 +111,19 @@ export function ReportFormModal({ classroomId, open, onClose, report }: ReportFo
                   </span>
                 }
                 hint={s.hint}
+                error={errors?.[`${s.key}_comment` as const]}
               >
-                <Textarea rows={4} value={form[`${s.key}_comment` as const]} onChange={set(`${s.key}_comment` as const)} />
+                <Textarea rows={4} value={form[`${s.key}_comment` as const]} onChange={set(`${s.key}_comment` as const)} invalid={!!errors?.[`${s.key}_comment` as const]} />
               </Field>
             ))}
           </div>
         </div>
 
-        <Field label="Comentarios y recomendaciones" hint="Próximos pasos, qué practicar en casa, mensaje final.">
-          <Textarea rows={4} value={form.comments} onChange={set("comments")} />
+        <Field label="Comentarios y recomendaciones" error={errors?.comments} hint="Próximos pasos, qué practicar en casa, mensaje final.">
+          <Textarea rows={4} value={form.comments} onChange={set("comments")} invalid={!!errors?.comments} />
         </Field>
 
+        {errors && <Alert tone="danger">Revisa los campos marcados en rojo: {Object.values(errors).join(" · ")}</Alert>}
         {genericError && <Alert tone="danger">{genericError}</Alert>}
       </div>
     </Modal>

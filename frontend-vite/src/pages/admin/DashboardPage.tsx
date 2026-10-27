@@ -72,7 +72,6 @@ export function DashboardPage() {
 
   const now = new Date();
   const balanceAlertsCount = balanceAlertsQuery.data ? balanceAlertsQuery.data.length : balanceAlertsQuery.isError ? 0 : null;
-  const showAlertsGrid = data.alerts.status === "ok" && !!balanceAlertsQuery.data && balanceAlertsQuery.data.length + data.alerts.data.length > 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
@@ -94,21 +93,6 @@ export function DashboardPage() {
           baja debajo, a su propio ancho completo. */}
       <Card>{data.agenda.status === "ok" ? <WeeklyAgenda blocks={data.agenda.data} /> : <SectionError />}</Card>
 
-      {/* `.xp-dashboard-alerts-grid` reparte las filas de OperationalAlertsPanel en columnas cuando
-          hay suficiente ancho, sin tocar ese componente (fuera del alcance permitido de este
-          cambio): su raíz ya es un `display:flex;flexDirection:column` fijo por estilo inline, así
-          que necesitamos `!important` para reemplazar SOLO `display` (nunca gap/orden/contenido) --
-          la clase solo se aplica cuando `showAlertsGrid` confirma que ese hijo es la lista real de
-          alertas (nunca el EmptyState/Spinner/SectionError, que deben seguir centrados en una sola
-          columna). `auto-fit` colapsa las columnas vacías: con 1 sola alerta se ve igual que antes
-          (una columna), con varias se reparten en 2+ según el ancho disponible. */}
-      <style>{`
-        .xp-dashboard-alerts-grid > div {
-          display: grid !important;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: var(--space-3);
-        }
-      `}</style>
       <Card header={cardTitle("Alertas")}>
         {data.alerts.status === "ok" ? (
           balanceAlertsQuery.isLoading ? (
@@ -118,9 +102,7 @@ export function DashboardPage() {
           ) : balanceAlertsQuery.isError || !balanceAlertsQuery.data ? (
             <SectionError />
           ) : (
-            <div className={showAlertsGrid ? "xp-dashboard-alerts-grid" : undefined}>
-              <OperationalAlertsPanel balanceAlerts={balanceAlertsQuery.data} operationalAlerts={data.alerts.data} />
-            </div>
+            <OperationalAlertsPanel balanceAlerts={balanceAlertsQuery.data} operationalAlerts={data.alerts.data} />
           )
         ) : (
           <SectionError />

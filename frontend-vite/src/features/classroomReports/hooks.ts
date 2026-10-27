@@ -20,6 +20,15 @@ function parseInput(input: ReportInput) {
   return parsed.data;
 }
 
+/** Mensaje para el docente: causa conocida en español, y siempre el detalle técnico para poder reportarlo. */
+function saveError(error: { code?: string; message: string }) {
+  console.error("[classroom_reports] save failed", error);
+  const detail = `Detalle: ${error.message}${error.code ? ` (código ${error.code})` : ""}`;
+  if (error.code === "42501") return new Error(`No tienes permiso para guardar reportes en este salón. Verifica que sigas asignado y que el salón esté activo. ${detail}`);
+  if (error.code === "23514") return new Error(`El reporte no cumple las reglas: necesita al menos un texto y máximo 5000 caracteres por campo. ${detail}`);
+  return new Error(`No pudimos guardar el reporte. ${detail}`);
+}
+
 /** RLS (0051): docentes/admin ven todo; el estudiante solo los publicados. */
 export function useClassroomReports(classroomId: number) {
   return useQuery({
@@ -52,12 +61,12 @@ export function useSaveReport(classroomId: number) {
       const data = parseInput(input);
       if (id !== undefined) {
         const { error } = await supabase.from("classroom_reports").update({ ...data, published }).eq("id", id);
-        if (error) throw new Error("No pudimos guardar el reporte. Inténtalo de nuevo en unos minutos.");
+        if (error) throw saveError(error);
         return;
       }
       if (!user) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
       const { error } = await supabase.from("classroom_reports").insert({ ...data, classroom_id: classroomId, author_id: user.id, published });
-      if (error) throw new Error("No pudimos guardar el reporte. Inténtalo de nuevo en unos minutos.");
+      if (error) throw saveError(error);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.classroomReports(classroomId) }),
   });
